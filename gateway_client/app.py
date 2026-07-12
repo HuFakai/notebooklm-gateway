@@ -203,10 +203,19 @@ class MainWindow(QMainWindow):
 
         # 此账号自定义的 api_key
         lbl_api_key = QLabel("为该账号分配的外部调用 API Key (自定义):")
+        config_layout.addWidget(lbl_api_key)
+
+        api_key_layout = QHBoxLayout()
         self.txt_api_key = QLineEdit()
         self.txt_api_key.setPlaceholderText("例如: my_notebook_key_abc123")
-        config_layout.addWidget(lbl_api_key)
-        config_layout.addWidget(self.txt_api_key)
+        
+        btn_gen_key = QPushButton("🎲 随机生成")
+        btn_gen_key.setStyleSheet("padding: 6px 12px; font-size: 12px; font-weight: normal; background-color: #3b82f6;")
+        btn_gen_key.clicked.connect(self.generate_random_key)
+        
+        api_key_layout.addWidget(self.txt_api_key)
+        api_key_layout.addWidget(btn_gen_key)
+        config_layout.addLayout(api_key_layout)
 
         layout.addLayout(config_layout)
 
@@ -267,6 +276,12 @@ class MainWindow(QMainWindow):
                 json.dump(settings, f)
         except Exception:
             pass
+
+    def generate_random_key(self):
+        """随机生成一个高强度的自定义外部调用 API Key"""
+        import secrets
+        random_hex = secrets.token_hex(8)
+        self.txt_api_key.setText(f"nmlg_{random_hex}")
 
     def start_google_login(self):
         email = self.txt_email.text().strip()

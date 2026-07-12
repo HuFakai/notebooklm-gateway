@@ -52,6 +52,18 @@ async def upload_credentials(data: CredentialsUpload, _ = Depends(verify_admin_t
     except Exception:
         raise HTTPException(status_code=400, detail="storage_state must be a valid JSON string")
 
+    # 检查 api_key 是否已被其他账号占用
+    with db._get_connection() as conn:
+        row = conn.execute(
+            "SELECT email FROM accounts WHERE api_key = ?", 
+            (data.api_key,)
+        ).fetchone()
+        if row and row["email"] != data.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=f"The API Key is already occupied by another account ({row['email']}). Please choose a different key."
+            )
+
     # 保存/覆盖到 SQLite 中
     success = db.save_account(
         email=data.email,
