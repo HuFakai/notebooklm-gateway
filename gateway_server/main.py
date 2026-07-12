@@ -24,6 +24,13 @@ class CredentialsUpload(BaseModel):
     master_token: str
     storage_state: str
 
+class StatusUpdateRequest(BaseModel):
+    status: str
+
+class KeyUpdateRequest(BaseModel):
+    api_key: str
+
+
 def verify_admin_token(request: Request):
     """管理员鉴权依赖"""
     auth_header = request.headers.get("Authorization")
@@ -80,7 +87,7 @@ async def upload_credentials(data: CredentialsUpload, _ = Depends(verify_admin_t
         if data.api_key in app.state.client_pool:
             try:
                 # 尝试安全地关闭旧会话
-                await app.state.client_pool[data.api_key].__aexit__(None, None, None)
+                await app.state.client_pool[data.api_key].close()
             except Exception:
                 pass
             del app.state.client_pool[data.api_key]
@@ -109,7 +116,7 @@ async def delete_account(account_id: int, _ = Depends(verify_admin_token)):
         api_key = row["api_key"]
         if hasattr(app.state, "client_pool") and api_key in app.state.client_pool:
             try:
-                await app.state.client_pool[api_key].__aexit__(None, None, None)
+                await app.state.client_pool[api_key].close()
             except Exception:
                 pass
             del app.state.client_pool[api_key]
@@ -119,6 +126,68 @@ async def delete_account(account_id: int, _ = Depends(verify_admin_token)):
         raise HTTPException(status_code=500, detail="Failed to delete account")
         
     return {"ok": True, "message": "Account deleted successfully."}
+
+
+@app.put("/admin/api/accounts/{account_id}/status", tags=["Admin"])
+async def update_account_status_api(account_id: int, data: StatusUpdateRequest, _ = Depends(verify_admin_token)):
+    """更新账号会话状态（支持 active / expired 等）"""
+    with db._get_connection() as conn:
+        row = conn.execute("SELECT email FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    email = row["email"]
+    success = db.update_account_status(email, data.status)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update account status")
+    
+    return {"ok": True, "message": f"Account status updated to {data.status}."}
+
+
+@app.put("/admin/api/accounts/{account_id}/key", tags=["Admin"])
+async def update_account_key_api(account_id: int, data: KeyUpdateRequest, _ = Depends(verify_admin_token)):
+    """更新账号外部调用 API Key"""
+    with db._get_connection() as conn:
+        row = conn.execute("SELECT email, api_key FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Account not found")
+        
+    email = row["email"]
+    old_key = row["api_key"]
+    new_key = data.api_key.strip()
+    if not new_key:
+        raise HTTPException(status_code=400, detail="API Key cannot be empty")
+        
+    with db._get_connection() as conn:
+        dup = conn.execute("SELECT email FROM accounts WHERE api_key = ? AND id != ?", (new_key, account_id)).fetchone()
+        if dup:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"The API Key is already occupied by another account ({dup['email']}). Please choose a different key."
+            )
+
+    try:
+        with db._get_connection() as conn:
+            conn.execute("UPDATE accounts SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_key, account_id))
+            conn.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update API Key: {e}")
+
+    if hasattr(app.state, "client_pool"):
+        if old_key in app.state.client_pool:
+            try:
+                await app.state.client_pool[old_key].close()
+            except Exception:
+                pass
+            del app.state.client_pool[old_key]
+        if new_key in app.state.client_pool:
+            try:
+                await app.state.client_pool[new_key].close()
+            except Exception:
+                pass
+            del app.state.client_pool[new_key]
+
+    return {"ok": True, "message": "API Key updated successfully."}
 
 
 # =====================================================================

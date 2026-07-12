@@ -135,8 +135,8 @@ async def get_client(request: Request) -> NotebookLMClient:
     # 6. 初始化并绑定当前会话
     try:
         from gateway_server.notebooklm.client import NotebookLMClient
-        client = NotebookLMClient(path=profile_dir)
-        await client.__aenter__()
+        client_ctx = NotebookLMClient.from_storage(path=str(profile_dir / "storage_state.json"))
+        client = await client_ctx.__aenter__()
         client_pool[api_key] = client
         return client
     except Exception as e:

@@ -446,15 +446,94 @@
 
                 // 操作列
                 const tdActions = document.createElement('td');
+                tdActions.style.display = 'flex';
+                tdActions.style.gap = '0.5rem';
+
+                // 修改 Key 按钮
+                const btnKey = document.createElement('button');
+                btnKey.className = 'btn-action';
+                btnKey.innerText = '🔑 修改 Key';
+                btnKey.onclick = () => updateAccountKey(acc.id, acc.email, acc.api_key);
+                tdActions.appendChild(btnKey);
+
+                // 切换状态按钮
+                const btnStatus = document.createElement('button');
+                btnStatus.className = 'btn-action';
+                btnStatus.innerText = acc.status === 'active' ? '🚫 停用' : '✅ 激活';
+                btnStatus.onclick = () => toggleAccountStatus(acc.id, acc.email, acc.status);
+                tdActions.appendChild(btnStatus);
+
+                // 删除按钮
                 const btnDel = document.createElement('button');
                 btnDel.className = 'btn-action btn-delete';
-                btnDel.innerText = '删除';
+                btnDel.innerText = '🗑️ 删除';
                 btnDel.onclick = () => deleteAccount(acc.id, acc.email);
                 tdActions.appendChild(btnDel);
-                tr.appendChild(tdActions);
 
+                tr.appendChild(tdActions);
                 tbody.appendChild(tr);
             });
+        }
+
+        async function updateAccountKey(id, email, currentKey) {
+            const newKey = prompt(`请输入托管邮箱 ${email} 的新 API Key:`, currentKey);
+            if (newKey === null) return; 
+            
+            const trimmed = newKey.trim();
+            if (!trimmed) {
+                alert('API Key 不能为空！');
+                return;
+            }
+
+            const token = localStorage.getItem('gateway_admin_token');
+            try {
+                const response = await fetch(`/admin/api/accounts/${id}/key`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ api_key: trimmed })
+                });
+                const data = await response.json();
+                if (response.status === 200 && data.ok) {
+                    alert('API Key 修改成功！');
+                    fetchAccounts();
+                } else {
+                    alert('修改失败: ' + (data.detail || data.message || '未知错误'));
+                }
+            } catch (e) {
+                alert('请求异常: ' + e);
+            }
+        }
+
+        async function toggleAccountStatus(id, email, currentStatus) {
+            const nextStatus = currentStatus === 'active' ? 'expired' : 'active';
+            const actionText = nextStatus === 'active' ? '激活' : '停用';
+            
+            if (!confirm(`确认要将托管账号 ${email} 变更为【${actionText}】状态吗？`)) {
+                return;
+            }
+
+            const token = localStorage.getItem('gateway_admin_token');
+            try {
+                const response = await fetch(`/admin/api/accounts/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: nextStatus })
+                });
+                const data = await response.json();
+                if (response.status === 200 && data.ok) {
+                    fetchAccounts();
+                } else {
+                    alert('状态更新失败: ' + (data.detail || data.message || '未知错误'));
+                }
+            } catch (e) {
+                alert('请求异常: ' + e);
+            }
         }
 
         async function deleteAccount(id, email) {
