@@ -1,0 +1,40 @@
+# NotebookLM Gateway Git Ignore
+
+# 本地环境变量配置与临时缓存
+.env
+temp_profile/
+gateway_client/temp_profile/
+gateway_client/settings.json
+
+# Python 虚拟环境与缓存
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 数据库文件 (SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# 本地调试与测试凭据
+credentials/
+storage_state.json
+master_token.json
+.notebooklm/
+
+# 桌面端编译打包输出
+build/
+dist/
+*.spec
+
+# 系统及编辑器
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.tmp

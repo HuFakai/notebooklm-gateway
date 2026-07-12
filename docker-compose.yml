@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  gateway:
+    build: .
+    image: notebooklm-gateway:latest
+    container_name: notebooklm-gateway-server
+    ports:
+      - "${GATEWAY_PORT:-18388}:18388"
+    volumes:
+      - ./data:/app/data
+    environment:
+      # 必须设置为 1，允许外部绑定调用
+      - NOTEBOOKLM_SERVER_ALLOW_EXTERNAL_BIND=1
+      # 网关全局管理 Token，用于桌面客户端推送凭证以及网页控制台鉴权
+      - NOTEBOOKLM_ADMIN_TOKEN=${GATEWAY_ADMIN_TOKEN:-admin_secret_token_change_me}
+    restart: always

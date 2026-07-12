@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>NotebookLM Gateway 控制台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #090b11;
+            --card-bg: rgba(18, 22, 35, 0.6);
+            --text: #f3f4f6;
+            --text-muted: #9ca3af;
+            --primary: #5865f2;
+            --primary-hover: #4752c4;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(88, 101, 242, 0.12) 0, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0, transparent 50%);
+        }
+        header {
+            backdrop-filter: blur(12px);
+            background: rgba(9, 11, 17, 0.7);
+            border-bottom: 1px solid var(--border);
+            padding: 1.2rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-weight: 700;
+            font-size: 1.4rem;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #fff 0%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .logo span {
+            background: linear-gradient(135deg, var(--primary) 0%, #a5b4fc 100%);
+            padding: 0.3rem 0.6rem;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.9rem;
+            -webkit-text-fill-color: #fff;
+        }
+        input[type="password"], input[type="text"] {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+        input[type="password"]:focus, input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2);
+        }
+        button {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        button:hover {
+            background: var(--primary-hover);
+        }
+        
+        /* 登录遮罩层 */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(9, 11, 17, 0.95);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+        .login-card {
+            background: rgba(18, 22, 35, 0.8);
+            border: 1px solid var(--border);
+            padding: 3rem;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 45px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            text-align: center;
+        }
+        .login-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .login-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: -0.5rem;
+        }
+        
+        main {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .stat-value.success { color: var(--success); }
+        .panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-top: 1.5rem;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            margin-top: 1rem;
+        }
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            font-size: 0.95rem;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 99px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success);
+        }
+        .status-badge.expired {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--danger);
+        }
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .key-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-action {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+        .btn-action:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+        .btn-delete {
+            border-color: rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+        .btn-delete:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ff6b6b;
+        }
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem 0;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+        .copy-msg {
+            color: var(--success);
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录遮罩层 -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card">
+            <h2 class="login-title">NotebookLM Gateway</h2>
+            <p class="login-subtitle">请输入您的管理员 Token 访问控制台</p>
+            <input type="password" id="adminTokenInput" placeholder="管理 Token (GATEWAY_ADMIN_TOKEN)" onkeydown="if(event.key==='Enter') login()">
+            <button onclick="login()">验证并登录</button>
+        </div>
+    </div>
+
+    <!-- 主控制台布局 -->
+    <header>
+        <div class="logo">
+            NotebookLM Gateway <span>控制台</span>
+        </div>
+        <div>
+            <button class="btn-logout" onclick="logout()">退出登录</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-label">托管账号总数</div>
+                <div class="stat-value" id="statCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">网关运行状态</div>
+                <div class="stat-value success">Active</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title">账号与凭证管理列表</div>
+                <button onclick="fetchAccounts()" class="btn-action">🔄 刷新数据</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>托管邮箱</th>
+                            <th>调用 API Key</th>
+                            <th>会话状态</th>
+                            <th>最后同步时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountsTableBody">
+                        <!-- 数据行 -->
+                    </tbody>
+                </table>
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    暂无任何托管凭证。请在本地使用助手登录 Google 并一键同步上传至此服务器。
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 检测本地是否已有 Token
+        const savedToken = localStorage.getItem('gateway_admin_token');
+        if (savedToken) {
+            // 如果有，隐藏登录框并加载列表
+            document.getElementById('loginOverlay').style.display = 'none';
+            fetchAccounts(savedToken);
+        }
+
+        async function login() {
+            const token = document.getElementById('adminTokenInput').value.strip ? 
+                document.getElementById('adminTokenInput').value.strip() : 
+                document.getElementById('adminTokenInput').value.trim();
+                
+            if (!token) {
+                alert('请输入 Token！');
+                return;
+            }
+            
+            const success = await fetchAccounts(token);
+            if (success) {
+                localStorage.setItem('gateway_admin_token', token);
+                document.getElementById('loginOverlay').style.display = 'none';
+            } else {
+                alert('Token 验证失败，请重新输入！');
+                document.getElementById('adminTokenInput').value = '';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('gateway_admin_token');
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('accountsTableBody').innerHTML = '';
+            document.getElementById('statCount').innerText = '0';
+        }
+
+        async function fetchAccounts(token) {
+            const targetToken = token || localStorage.getItem('gateway_admin_token');
+            if (!targetToken) return false;
+
+            try {
+                const response = await fetch('/admin/api/accounts', {
+                    headers: { 'Authorization': `Bearer ${targetToken}` }
+                });
+                
+                if (response.status === 401) {
+                    if (!token) logout(); // 如果是自动加载且过期，退出登录
+                    return false;
+                }
+                
+                const data = await response.json();
+                if (data.ok) {
+                    renderTable(data.accounts);
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('API 请求异常: ', e);
+                return false;
+            }
+        }
+
+        function renderTable(accounts) {
+            const tbody = document.getElementById('accountsTableBody');
+            const empty = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+            
+            document.getElementById('statCount').innerText = accounts.length;
+            
+            if (accounts.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            accounts.forEach(acc => {
+                const tr = document.createElement('tr');
+                
+                // 邮箱列
+                const tdEmail = document.createElement('td');
+                tdEmail.innerText = acc.email;
+                tr.appendChild(tdEmail);
+
+                // API Key 列
+                const tdKey = document.createElement('td');
+                tdKey.className = 'key-cell';
+                tdKey.innerHTML = `
+                    <code>${acc.api_key}</code>
+                    <button class="btn-action" onclick="copyToClipboard('${acc.api_key}', this)">复制</button>
+                    <span class="copy-msg">已复制</span>
+                `;
+                tr.appendChild(tdKey);
+
+                // 状态列
+                const tdStatus = document.createElement('td');
+                const badge = document.createElement('span');
+                badge.className = `status-badge ${acc.status}`;
+                badge.innerHTML = `<span class="status-dot"></span>${acc.status === 'active' ? '正常' : '已过期'}`;
+                tdStatus.appendChild(badge);
+                tr.appendChild(tdStatus);
+
+                // 同步时间
+                const tdTime = document.createElement('td');
+                tdTime.innerText = new Date(acc.updated_at).toLocaleString();
+                tr.appendChild(tdTime);
+
+                // 操作列
+                const tdActions = document.createElement('td');
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-action btn-delete';
+                btnDel.innerText = '删除';
+                btnDel.onclick = () => deleteAccount(acc.id, acc.email);
+                tdActions.appendChild(btnDel);
+                tr.appendChild(tdActions);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function deleteAccount(id, email) {
+            if (!confirm(`确认要删除托管账号 ${email} 及其关联的所有 API Key 吗？`)) {
+                return;
+            }
+            const token = localStorage.getItem('gateway_admin_token');
+            try {
+                const response = await fetch(`/admin/api/accounts/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    fetchAccounts();
+                } else {
+                    alert('删除失败: ' + data.message);
+                }
+            } catch (e) {
+                alert('请求异常: ' + e);
+            }
+        }
+
+        function copyToClipboard(text, btn) {
+            navigator.clipboard.writeText(text);
+            const msg = btn.nextElementSibling;
+            msg.style.opacity = '1';
+            setTimeout(() => {
+                msg.style.opacity = '0';
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
