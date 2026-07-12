@@ -167,16 +167,24 @@ def capture_oauth_token(
         try:
             page.goto(_EMBEDDED_SETUP_URL)
             # Poll the context's cookie jar for oauth_token until present/timeout.
-            deadline = page.evaluate("Date.now()") + timeout_s * 1000
+            import time
+            deadline = time.time() + timeout_s
             token = ""
-            while page.evaluate("Date.now()") < deadline:
-                for c in context.cookies():
-                    if c.get("name") == "oauth_token" and c.get("value"):
-                        token = c["value"]
-                        break
+            while time.time() < deadline:
+                try:
+                    for c in context.cookies():
+                        if c.get("name") == "oauth_token" and c.get("value"):
+                            token = c["value"]
+                            break
+                except Exception:
+                    pass
                 if token:
                     break
-                page.wait_for_timeout(1000)
+                try:
+                    page.wait_for_timeout(1000)
+                except Exception:
+                    time.sleep(1)
+
         finally:
             page.close()  # always close the page WE created
             if owns_context:

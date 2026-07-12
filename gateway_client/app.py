@@ -3,6 +3,7 @@ import sys
 import json
 import asyncio
 import httpx
+import traceback
 from pathlib import Path
 
 # 将项目根目录加入 sys.path 以防导入错误
@@ -12,6 +13,7 @@ if project_root not in sys.path:
 
 # 桌面端程序本地工作目录
 CLIENT_DIR = Path(__file__).resolve().parent
+
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
@@ -36,16 +38,16 @@ class LoginWorker(QThread):
 
     def run(self):
         try:
-            self.log_signal.emit("正在拉起 Google 登录浏览器窗口，请在弹出的浏览器中完成登录...")
+            self.log_signal.emit("🚀 [1/3] 正在拉起 Google 登录浏览器窗口，请在弹出的浏览器中完成登录...")
             
             # 1. 拦截 oauth_token (Master Token 阶段 1)
             token = mt_service.capture_oauth_token(browser=self.browser_type)
             if not token:
-                self.error_signal.emit("未捕获到主令牌，请确保登录成功并进入了 NotebookLM 页面。")
+                self.error_signal.emit("❌ 未捕获到主令牌，请确保登录成功并进入了 NotebookLM 页面。")
                 return
 
-            self.log_signal.emit("成功捕获主令牌 (Master Token)。")
-            self.log_signal.emit("正在利用 Master Token 向 Google 铸造 API Session Cookies...")
+            self.log_signal.emit("✅ 成功捕获主令牌 (Master Token)。")
+            self.log_signal.emit("🚀 [2/3] 正在向 Google 铸造 API Session Cookies 并生成关联配置...")
 
             # 2. 模拟本地路径，用于 bootstrap 生成临时凭证
             temp_profile_dir = CLIENT_DIR / "temp_profile"
@@ -59,10 +61,13 @@ class LoginWorker(QThread):
                 os.remove(storage_path)
 
             android_id = generate_android_id()
+            self.log_signal.emit(f"   - 自动生成安卓客户端 ID: {android_id}")
 
             # 3. 运行同步异步机制生成 credentials 
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            
+            self.log_signal.emit("   - 正在调用 Google API 并保存 credentials，这可能需要数秒...")
             loop.run_until_complete(
                 mt_service.bootstrap(
                     email=self.email,
@@ -76,15 +81,16 @@ class LoginWorker(QThread):
 
             # 读取生成的数据
             if not storage_path.exists() or not master_token_path.exists():
-                self.error_signal.emit("铸造 Cookie 失败，凭证未能保存到本地。")
+                self.error_signal.emit("❌ 铸造 Cookie 失败，凭证文件未能成功生成到本地。")
                 return
 
-            with open(storage_path, "r") as f:
+            with open(storage_path, "r", encoding="utf-8") as f:
                 storage_state = f.read()
-            with open(master_token_path, "r") as f:
+            with open(master_token_path, "r", encoding="utf-8") as f:
                 master_token_obj = json.load(f)
                 master_token = master_token_obj.get("token")
 
+            self.log_signal.emit("🚀 [3/3] 正在清理本地临时运行环境缓存...")
             # 清理临时文件
             os.remove(storage_path)
             os.remove(master_token_path)
@@ -99,7 +105,9 @@ class LoginWorker(QThread):
             })
 
         except Exception as e:
-            self.error_signal.emit(f"登录抓取过程发生异常: {e}")
+            detailed_tb = traceback.format_exc()
+            self.error_signal.emit(f"❌ 登录抓取过程发生异常: {e}\n\n详细崩溃日志:\n{detailed_tb}")
+
 
 
 class MainWindow(QMainWindow):
