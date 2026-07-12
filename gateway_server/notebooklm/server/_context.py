@@ -14,6 +14,7 @@ This module imports NO ``click`` / ``rich`` / ``cli``.
 
 from __future__ import annotations
 
+from pathlib import Path
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -60,7 +61,6 @@ async def get_client(request: Request) -> NotebookLMClient:
     from gateway_server.database import DatabaseManager
     import os
     import json
-    from pathlib import Path
     from fastapi import HTTPException, status
 
     db = DatabaseManager()
