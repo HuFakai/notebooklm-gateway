@@ -21,7 +21,7 @@ from PySide6.QtCore import Qt, QThread, Signal
 
 # 导入底层的主令牌登录和同步逻辑
 from gateway_server.notebooklm.cli.services.login import master_token as mt_service
-from gateway_server.notebooklm.cli.services.login.master_token import generate_android_id
+from gateway_server.notebooklm.auth import generate_android_id
 
 class LoginWorker(QThread):
     """用于在后台运行 Playwright 捕获主令牌和铸造 Cookie 的线程，防止 UI 假死"""

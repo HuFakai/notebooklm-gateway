@@ -74,14 +74,22 @@ docker compose up -d --build
 
 ### 如何运行客户端
 ```bash
-# 激活项目本地的虚拟环境
-source .venv/bin/activate
+# 1. 如果本地尚未创建 Python 虚拟环境，请先创建：
+python -m venv .venv
 
-# 1. 确保安装了客户端依赖项
+# 2. 激活项目本地的虚拟环境
+# macOS / Linux:
+source .venv/bin/activate
+# Windows (cmd):
+# .venv\Scripts\activate.bat
+# Windows (PowerShell):
+# .venv\Scripts\Activate.ps1
+
+# 3. 安装客户端所必须的依赖项与浏览器驱动
 pip install PySide6 playwright httpx pyinstaller
 playwright install chrome
 
-# 2. 启动本地助手
+# 4. 启动本地助手
 python gateway_client/app.py
 ```
 
