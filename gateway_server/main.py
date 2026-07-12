@@ -9,9 +9,18 @@ from fastapi.staticfiles import StaticFiles
 # 引入数据库和核心应用工厂
 from gateway_server.database import DatabaseManager
 from gateway_server.notebooklm.server.app import create_app
+from fastapi.middleware.cors import CORSMiddleware
 
 # 1. 继承原版核心应用，获得所有的 /v1 业务路由
 app = create_app()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 db = DatabaseManager()
 

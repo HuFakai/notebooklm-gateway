@@ -64,10 +64,10 @@
       -webkit-text-fill-color: transparent;
     }
 
-    /* 主布局 */
+    /* 主布局 - 宽度拉伸 */
     .app-container {
       display: grid;
-      grid-template-columns: 380px 1fr 400px;
+      grid-template-columns: 420px 1fr 440px;
       gap: 1.5rem;
       padding: 1.5rem;
       flex: 1;
@@ -185,22 +185,25 @@
       overflow-y: auto;
     }
 
+    /* 优化 Tab 导航条展示 - 平铺且字号略微缩减，避免换行折叠 */
     .tab-nav {
       display: flex;
-      gap: 0.4rem;
+      justify-content: space-between;
+      gap: 0.2rem;
       margin-bottom: 1.2rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       padding-bottom: 0.5rem;
-      overflow-x: auto;
     }
 
     .tab-btn {
+      flex: 1;
+      text-align: center;
       background: none;
       border: none;
       color: var(--text-muted);
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 600;
-      padding: 0.4rem 0.8rem;
+      padding: 0.4rem 0.2rem;
       cursor: pointer;
       border-radius: 6px;
       transition: all 0.3s ease;
@@ -278,7 +281,7 @@
       font-size: 0.8rem;
       color: var(--neon-purple);
       word-break: break-all;
-      max-width: 200px;
+      max-width: 240px;
       text-align: right;
     }
 
@@ -382,10 +385,11 @@
     <div class="glass-card control-panel">
       <div class="card-title">🕹️ API 控制沙盒</div>
       
+      <!-- 优化 Tab 文字字数，防止被遮挡 -->
       <div class="tab-nav">
         <button class="tab-btn active" onclick="switchTab('notebooks')">笔记本</button>
-        <button class="tab-btn" onclick="switchTab('sources')">文档来源</button>
-        <button class="tab-btn" onclick="switchTab('chat')">对话问答</button>
+        <button class="tab-btn" onclick="switchTab('sources')">来源</button>
+        <button class="tab-btn" onclick="switchTab('chat')">对话</button>
         <button class="tab-btn" onclick="switchTab('notes')">笔记</button>
         <button class="tab-btn" onclick="switchTab('artifacts')">Studio</button>
       </div>
@@ -479,16 +483,126 @@
         </div>
       </div>
 
-      <!-- Tab: Studio -->
+      <!-- Tab: Studio (完全体) -->
       <div class="tab-content" id="tab-artifacts">
         <div class="form-group">
-          <label>生成工件类型</label>
+          <label>生成工件类型 (完全体)</label>
           <select id="art-gen-type" onchange="adjustArtifactForm()">
             <option value="quiz">测验卷 (Quiz)</option>
-            <option value="report">简报报告 (Report)</option>
+            <option value="report">研究简报 (Report)</option>
             <option value="audio">音频播客 (Audio)</option>
+            <option value="video">视频播客 (Video)</option>
+            <option value="slide-deck">幻灯片 (Slide Deck)</option>
+            <option value="flashcards">闪卡 (Flashcards)</option>
+            <option value="infographic">信息图 (Infographic)</option>
+            <option value="data-table">数据表格 (Data Table)</option>
+            <option value="mind-map">脑图 (Mind Map)</option>
           </select>
         </div>
+
+        <!-- 1. Audio 专有参数 -->
+        <div id="art-audio-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
+          <div class="form-group">
+            <label>音频格式 (audio_format)</label>
+            <select id="art-audio-format">
+              <option value="deep-dive">deep-dive (深入对话)</option>
+              <option value="brief">brief (简短播报)</option>
+              <option value="critique">critique (批判视角)</option>
+              <option value="debate">debate (辩论模式)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>音频长度 (audio_length)</label>
+            <select id="art-audio-length">
+              <option value="default">default (默认)</option>
+              <option value="short">short (简短)</option>
+              <option value="long">long (较长)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 2. Slide Deck 专有参数 -->
+        <div id="art-slide-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
+          <div class="form-group">
+            <label>幻灯片格式 (deck_format)</label>
+            <select id="art-slide-format">
+              <option value="detailed">detailed (详细模式)</option>
+              <option value="presenter">presenter (简易演讲)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>幻灯片长度 (deck_length)</label>
+            <select id="art-slide-length">
+              <option value="default">default (默认)</option>
+              <option value="short">short (简短)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 3. Quiz & Flashcards 专有参数 -->
+        <div id="art-quiz-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
+          <div class="form-group">
+            <label>生成数量 (quantity)</label>
+            <select id="art-quiz-quantity">
+              <option value="standard">standard (标准)</option>
+              <option value="fewer">fewer (较少)</option>
+              <option value="more">more (较多)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>难度级别 (difficulty)</label>
+            <select id="art-quiz-difficulty">
+              <option value="medium">medium (中等)</option>
+              <option value="easy">easy (简单)</option>
+              <option value="hard">hard (困难/硬核)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 4. Infographic 专有参数 -->
+        <div id="art-info-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
+          <div class="form-group">
+            <label>图片方向 (orientation)</label>
+            <select id="art-info-orientation">
+              <option value="portrait">portrait (竖屏)</option>
+              <option value="landscape">landscape (横屏)</option>
+              <option value="square">square (正方形)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>细节详略 (detail)</label>
+            <select id="art-info-detail">
+              <option value="standard">standard (标准)</option>
+              <option value="concise">concise (简洁)</option>
+              <option value="detailed">detailed (详细)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 5. Mind Map 专有参数 -->
+        <div id="art-map-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>脑图类型 (map_kind)</label>
+            <select id="art-map-kind">
+              <option value="interactive">interactive (可交互)</option>
+              <option value="note-backed">note-backed (带有笔记备份)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 6. Report 专有参数 -->
+        <div id="art-report-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>报告格式 (report_format)</label>
+            <select id="art-report-format">
+              <option value="briefing-doc">briefing-doc (简报报告)</option>
+              <option value="study-guide">study-guide (学习指南)</option>
+              <option value="blog-post">blog-post (博客文章)</option>
+              <option value="custom">custom (自定义)</option>
+            </select>
+          </div>
+        </div>
+
         <div class="form-group">
           <label>AI 生成指令 (Prompt)</label>
           <input type="text" id="art-gen-instructions" value="针对目前的主题生成一份内容。">
@@ -595,6 +709,8 @@
       if (localStorage.getItem('nml_gateway_key')) {
         document.getElementById('cfg-key').value = localStorage.getItem('nml_gateway_key');
       }
+      // 初始化展示对应参数
+      adjustArtifactForm();
     };
 
     // 配置保存
@@ -861,7 +977,7 @@
 
     async function apiListNotes() {
       if (!ctx.notebook_id) return appendLog("请先指定 Notebook ID 锁定上下文", true);
-      const res = await makeRequest('GET', `/v1/notebooks/${ctx.notebook_id}/notes`);
+      const res = await makeRequest('GET', '/v1/notebooks/' + ctx.notebook_id + '/notes');
       if (res.ok && res.data.notes && res.data.notes.length > 0) {
         ctx.note_id = res.data.notes[0].id;
         updateCtxUI();
@@ -902,6 +1018,33 @@
       }
     }
 
+    // ----------------------------------------------------
+    // 工件配置动态面板切换逻辑
+    // ----------------------------------------------------
+    function adjustArtifactForm() {
+      const type = document.getElementById('art-gen-type').value;
+      
+      // 先隐藏所有专属选项
+      document.querySelectorAll('.art-extra-opts').forEach(el => {
+        el.style.display = 'none';
+      });
+      
+      // 根据类型选择性展示
+      if (type === 'audio') {
+        document.getElementById('art-audio-opts').style.display = 'block';
+      } else if (type === 'slide-deck') {
+        document.getElementById('art-slide-opts').style.display = 'block';
+      } else if (type === 'quiz' || type === 'flashcards') {
+        document.getElementById('art-quiz-opts').style.display = 'block';
+      } else if (type === 'infographic') {
+        document.getElementById('art-info-opts').style.display = 'block';
+      } else if (type === 'mind-map') {
+        document.getElementById('art-map-opts').style.display = 'block';
+      } else if (type === 'report') {
+        document.getElementById('art-report-opts').style.display = 'block';
+      }
+    }
+
     async function apiGenerateArtifact() {
       if (!ctx.notebook_id) return appendLog("请先指定 Notebook ID 锁定上下文", true);
       const type = document.getElementById('art-gen-type').value;
@@ -911,6 +1054,25 @@
         type,
         instructions: inst || "直接生成一份内容。"
       };
+      
+      // 动态拼装专属参数
+      if (type === 'audio') {
+        payload.audio_format = document.getElementById('art-audio-format').value;
+        payload.audio_length = document.getElementById('art-audio-length').value;
+      } else if (type === 'slide-deck') {
+        payload.deck_format = document.getElementById('art-slide-format').value;
+        payload.deck_length = document.getElementById('art-slide-length').value;
+      } else if (type === 'quiz' || type === 'flashcards') {
+        payload.quantity = document.getElementById('art-quiz-quantity').value;
+        payload.difficulty = document.getElementById('art-quiz-difficulty').value;
+      } else if (type === 'infographic') {
+        payload.orientation = document.getElementById('art-info-orientation').value;
+        payload.detail = document.getElementById('art-info-detail').value;
+      } else if (type === 'mind-map') {
+        payload.map_kind = document.getElementById('art-map-kind').value;
+      } else if (type === 'report') {
+        payload.report_format = document.getElementById('art-report-format').value;
+      }
       
       const res = await makeRequest('POST', `/v1/notebooks/${ctx.notebook_id}/artifacts`, payload);
       if (res.ok && res.data.task_id) {
