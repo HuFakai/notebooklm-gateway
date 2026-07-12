@@ -136,7 +136,7 @@ def test_api():
     # ----------------------------------------------------
     wait_for_user("7. 发起流式对话测试 (POST /v1/notebooks/{id}/chat)")
     chat_payload = {
-        "input": "请帮我用一句话总结一下刚才添加的关于深空探测技术的文本中，中国嫦娥探测器起到了什么作用？"
+        "question": "请帮我用一句话总结一下刚才添加的关于深空探测技术的文本中，中国嫦娥探测器起到了什么作用？"
     }
     chat_url = f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/chat"
     print("🚀 正在发起对话，等待网关流式 (SSE Stream) 返回结果:")
@@ -173,7 +173,7 @@ def test_api():
     wait_for_user("8. 创建测试笔记 (POST /v1/notebooks/{id}/notes)")
     note_payload = {
         "title": "我的航天梦笔记",
-        "text": "探索引力波和深空宇宙是人类未来的终极使命。"
+        "content": "探索引力波 and 深空宇宙是人类未来的终极使命。"
     }
     try:
         resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes", headers=headers, json=note_payload, timeout=20.0)
@@ -208,7 +208,7 @@ def test_api():
     wait_for_user("10. 修改测试笔记内容 (PUT /v1/notebooks/{id}/notes/{note_id})")
     update_note_payload = {
         "title": "我的航天梦笔记(已修改)",
-        "text": "修改后的内容：宇宙的尽头不仅是引力波，还有无尽的奥秘待发掘。"
+        "content": "修改后的内容：宇宙的尽头不仅是引力波，还有无尽的奥秘待发掘。"
     }
     try:
         resp = httpx.put(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes/{temp_note_id}", headers=headers, json=update_note_payload, timeout=20.0)
