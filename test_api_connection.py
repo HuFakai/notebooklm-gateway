@@ -13,197 +13,341 @@ headers = {
     "Content-Type": "application/json"
 }
 
-def wait_for_user(step_name):
+# 全局上下文缓存，用于单步调试
+ctx = {
+    "notebook_id": None,
+    "source_id": None,
+    "note_id": None,
+    "task_id": None
+}
+
+def get_headers():
+    return {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+def print_ctx():
     print("\n" + "=" * 60)
-    input(f"👉 [确认] {step_name} 测试已就绪。请按 【回车键/Enter】 开始执行该项测试...")
+    print("🛠️  当前交互调试上下文缓存:")
+    print(f"   - 笔记本 ID (notebook_id) : {ctx['notebook_id'] or '未绑定'}")
+    print(f"   - 来源 ID   (source_id)   : {ctx['source_id'] or '未绑定'}")
+    print(f"   - 笔记 ID   (note_id)     : {ctx['note_id'] or '未绑定'}")
+    print(f"   - 任务 ID   (task_id)     : {ctx['task_id'] or '未绑定'}")
     print("=" * 60)
 
-def test_api():
-    print("🌟 开始执行 NotebookLM Gateway 全接口联通性流水线测试 🌟")
-    print(f"远程网关地址: {BASE_URL}")
-    print(f"API Key: {API_KEY}")
-
-    temp_notebook_id = None
-    temp_source_id = None
-    temp_file_source_id = None
-    temp_note_id = None
-    temp_task_id = None
-
-    # ----------------------------------------------------
-    # 1. 测试列出笔记本列表
-    # ----------------------------------------------------
-    wait_for_user("1. 获取笔记本列表 (GET /v1/notebooks)")
-    notebooks_url = f"{BASE_URL}/v1/notebooks"
+def ensure_notebook_id():
+    """保证当前有可用的笔记本 ID，若没有则引导拉取列表并绑定第一个"""
+    if ctx["notebook_id"]:
+        return ctx["notebook_id"]
+    
+    print("\nℹ️ 正在尝试拉取可用笔记本列表...")
     try:
-        resp = httpx.get(notebooks_url, headers=headers, timeout=20.0)
+        resp = httpx.get(f"{BASE_URL}/v1/notebooks", headers=get_headers(), timeout=10.0)
         if resp.status_code == 200:
             notebooks = resp.json().get("notebooks", [])
-            print("✅ 获取成功！当前托管邮箱下的笔记本列表:")
-            for index, nb in enumerate(notebooks):
-                print(f"   [{index + 1}] 名称: {nb.get('title')} | ID: {nb.get('id')}")
+            if notebooks:
+                ctx["notebook_id"] = notebooks[0].get("id")
+                print(f"🎯 自动绑定列表首个笔记本 ID: {ctx['notebook_id']} ({notebooks[0].get('title')})")
+                return ctx["notebook_id"]
+            else:
+                print("⚠️ 该账号下没有任何笔记本！")
         else:
-            print(f"❌ 获取失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            print(f"⚠️ 拉取笔记本失败！状态码: {resp.status_code}")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"⚠️ 网络异常: {e}")
+    
+    user_id = input("👉 请手动输入要测试的笔记本 ID (或直接回车退出): ").strip()
+    if user_id:
+        ctx["notebook_id"] = user_id
+        return user_id
+    return None
 
-    # ----------------------------------------------------
-    # 2. 测试创建临时测试笔记本
-    # ----------------------------------------------------
-    wait_for_user("2. 创建临时测试笔记本 (POST /v1/notebooks)")
-    create_payload = {
-        "title": f"Gateway_AutoTest_{int(time.time())}"
-    }
+def ensure_source_id():
+    """保证当前有可用的文档来源 ID"""
+    if ctx["source_id"]:
+        return ctx["source_id"]
+    nb_id = ensure_notebook_id()
+    if not nb_id:
+        return None
+    print("\nℹ️ 正在拉取该笔记本下的所有来源...")
     try:
-        resp = httpx.post(f"{BASE_URL}/v1/notebooks", headers=headers, json=create_payload, timeout=20.0)
-        if resp.status_code == 201 or resp.status_code == 200:
-            data = resp.json()
-            temp_notebook_id = data.get("id")
-            print(f"✅ 创建成功！临时笔记本名称: {data.get('title')} | ID: {temp_notebook_id}")
-        else:
-            print(f"❌ 创建失败！状态码: {resp.status_code}, 返回: {resp.text}")
-            return
-    except Exception as e:
-        print(f"❌ 网络异常: {e}")
-        return
-
-    # ----------------------------------------------------
-    # 3. 测试重命名临时笔记本
-    # ----------------------------------------------------
-    wait_for_user("3. 重命名笔记本 (PATCH /v1/notebooks/{id})")
-    rename_payload = {
-        "title": "Gateway_AutoTest_Notebook_Renamed"
-    }
-    try:
-        resp = httpx.patch(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}", headers=headers, json=rename_payload, timeout=20.0)
+        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{nb_id}/sources", headers=get_headers(), timeout=10.0)
         if resp.status_code == 200:
-            print("✅ 重命名指令发送成功！")
+            sources = resp.json().get("sources", [])
+            if sources:
+                ctx["source_id"] = sources[0].get("id")
+                print(f"🎯 自动绑定首个文档来源 ID: {ctx['source_id']} ({sources[0].get('title')})")
+                return ctx["source_id"]
+            else:
+                print("⚠️ 该笔记本下没有任何文档来源！")
         else:
-            print(f"❌ 重命名失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            print(f"⚠️ 拉取来源失败！状态码: {resp.status_code}")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"⚠️ 网络异常: {e}")
+    
+    user_id = input("👉 请手动输入要测试的来源 ID (或直接回车退出): ").strip()
+    if user_id:
+        ctx["source_id"] = user_id
+        return user_id
+    return None
 
-    # ----------------------------------------------------
-    # 4. 测试获取笔记本详情
-    # ----------------------------------------------------
-    wait_for_user("4. 获取笔记本详情 (GET /v1/notebooks/{id})")
+def ensure_note_id():
+    """保证当前有可用的笔记 ID"""
+    if ctx["note_id"]:
+        return ctx["note_id"]
+    nb_id = ensure_notebook_id()
+    if not nb_id:
+        return None
+    print("\nℹ️ 正在拉取该笔记本下的所有笔记...")
     try:
-        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}", headers=headers, timeout=20.0)
+        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{nb_id}/notes", headers=get_headers(), timeout=10.0)
         if resp.status_code == 200:
-            data = resp.json()
-            print(f"✅ 获取成功！当前笔记本最新名称: {data.get('title')}")
+            notes = resp.json().get("notes", [])
+            if notes:
+                ctx["note_id"] = notes[0].get("id")
+                print(f"🎯 自动绑定首个笔记 ID: {ctx['note_id']} ({notes[0].get('title')})")
+                return ctx["note_id"]
+            else:
+                print("⚠️ 该笔记本下没有任何笔记！")
         else:
-            print(f"❌ 获取详情失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            print(f"⚠️ 拉取笔记失败！状态码: {resp.status_code}")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"⚠️ 网络异常: {e}")
+    
+    user_id = input("👉 请手动输入要测试的笔记 ID (或直接回车退出): ").strip()
+    if user_id:
+        ctx["note_id"] = user_id
+        return user_id
+    return None
 
-    # ----------------------------------------------------
-    # 5. 测试添加文本来源 (Text Source)
-    # ----------------------------------------------------
-    wait_for_user("5. 添加自定义文本来源 (POST /v1/notebooks/{id}/sources/text)")
-    source_payload = {
-        "title": "深空探测技术简史",
-        "text": "深空探测是指航天器在距离地球200万公里以上的空间进行的探测活动。中国嫦娥系列探测器在月球背面的成功着陆，为人类探索太空奠定了重要基石。"
-    }
+# ----------------------------------------------------
+# API 路由独立方法
+# ----------------------------------------------------
+def cmd_list_notebooks():
+    url = f"{BASE_URL}/v1/notebooks"
+    print(f"\n🚀 请求: GET {url}")
     try:
-        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources/text", headers=headers, json=source_payload, timeout=25.0)
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+        notebooks = resp.json().get("notebooks", [])
+        if notebooks:
+            ctx["notebook_id"] = notebooks[0].get("id") # 自动缓存
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_create_notebook():
+    url = f"{BASE_URL}/v1/notebooks"
+    title = input("📝 请输入新建笔记本名称 (留空默认随机): ").strip()
+    if not title:
+        title = f"Test_Notebook_{int(time.time())}"
+    print(f"\n🚀 请求: POST {url}")
+    try:
+        resp = httpx.post(url, headers=get_headers(), json={"title": title}, timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
         if resp.status_code in (200, 201):
-            data = resp.json()
-            temp_source_id = data.get("id") or (data.get("source", {}).get("id"))
-            print(f"✅ 文本来源添加成功！来源名称: {data.get('title') or (data.get('source', {}).get('title'))} | ID: {temp_source_id}")
-        else:
-            print(f"❌ 添加来源失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            ctx["notebook_id"] = resp.json().get("id")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 6. 测试物理文件上传 (File Source)
-    # ----------------------------------------------------
-    wait_for_user("6. 上传物理测试文件 (POST /v1/notebooks/{id}/sources/file)")
-    # 本地生成测试临时文件
+def cmd_rename_notebook():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}"
+    title = input("📝 请输入修改后的新名字: ").strip()
+    if not title: return
+    print(f"\n🚀 请求: PATCH {url}")
+    try:
+        resp = httpx.patch(url, headers=get_headers(), json={"title": title}, timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_notebook_detail():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}"
+    print(f"\n🚀 请求: GET {url}")
+    try:
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_add_text_source():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/text"
+    print(f"\n🚀 请求: POST {url}")
+    payload = {
+        "title": "深空探测技术简史",
+        "text": "深空探测是指航天器在距离地球200万公里以上的空间进行的探测活动。目前，中国嫦娥系列探测器在月球背面的成功着陆，为人类探索太空奠定了重要基石。"
+    }
+    try:
+        resp = httpx.post(url, headers=get_headers(), json=payload, timeout=25.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+        if resp.status_code in (200, 201):
+            ctx["source_id"] = resp.json().get("id") or resp.json().get("source", {}).get("id")
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_add_file_source():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/file"
+    print(f"\n🚀 请求: POST {url}")
+    
     test_filename = "gateway_test_upload.txt"
     with open(test_filename, "w", encoding="utf-8") as f:
-        f.write("这篇文档是网关接口文件上传功能测试所自动上传的测试数据。引力波是时空弯曲中的涟漪，爱因斯坦在广义相对论中预言了它的存在。")
-
-    file_headers = {
-        "Authorization": f"Bearer {API_KEY}"
-        # 排除 Content-Type，httpx 会自动处理 boundary
-    }
+        f.write("引力波是时空弯曲中的涟漪，爱因斯坦在广义相对论中预言了它的存在。这一发现在天体物理学上具有划时代意义。")
+    
+    file_headers = {"Authorization": f"Bearer {API_KEY}"}
     try:
         with open(test_filename, "rb") as f:
             files = {"file": (test_filename, f, "text/plain")}
-            resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources/file", headers=file_headers, files=files, timeout=40.0)
+            resp = httpx.post(url, headers=file_headers, files=files, timeout=40.0)
+            print(f"状态码: {resp.status_code}")
+            print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
             if resp.status_code in (200, 201):
-                data = resp.json()
-                temp_file_source_id = data.get("id") or (data.get("source", {}).get("id"))
-                print(f"✅ 物理文件上传成功！来源 ID: {temp_file_source_id}")
-            else:
-                print(f"❌ 物理文件上传失败！状态码: {resp.status_code}, 返回: {resp.text}")
+                ctx["source_id"] = resp.json().get("id") or resp.json().get("source", {}).get("id")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
     finally:
         if os.path.exists(test_filename):
             os.remove(test_filename)
 
-    # ----------------------------------------------------
-    # 7. 测试获取该笔记本的来源列表
-    # ----------------------------------------------------
-    wait_for_user("7. 获取来源列表 (GET /v1/notebooks/{id}/sources)")
+def cmd_add_url_source():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/url"
+    target_url = input("🔗 请输入要挂载解析的网页 URL: ").strip()
+    if not target_url: return
+    print(f"\n🚀 请求: POST {url}")
     try:
-        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources", headers=headers, timeout=20.0)
-        if resp.status_code == 200:
-            sources_list = resp.json().get("sources", [])
-            print("✅ 获取来源列表成功！当前笔记本的所有文档来源:")
-            for index, src in enumerate(sources_list):
-                print(f"   [{index + 1}] 来源: {src.get('title')} | ID: {src.get('id')} | 类型: {src.get('type')}")
-        else:
-            print(f"❌ 获取来源列表失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        resp = httpx.post(url, headers=get_headers(), json={"url": target_url}, timeout=30.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+        if resp.status_code in (200, 201):
+            ctx["source_id"] = resp.json().get("id") or resp.json().get("source", {}).get("id")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 8. 测试配置对话行为
-    # ----------------------------------------------------
-    wait_for_user("8. 配置对话 Preset 行为 (POST /v1/notebooks/{id}/chat/configure)")
-    config_payload = {
-        "chat_mode": "concise" # 简洁Pres行为
+def cmd_add_batch_urls():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/batch"
+    urls_str = input("🔗 请输入要批量挂载的 URL 列表 (逗号分隔): ").strip()
+    if not urls_str: return
+    urls = [u.strip() for u in urls_str.split(",") if u.strip()]
+    print(f"\n🚀 请求: POST {url}")
+    try:
+        resp = httpx.post(url, headers=get_headers(), json={"urls": urls}, timeout=30.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_list_sources():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources"
+    print(f"\n🚀 请求: GET {url}")
+    try:
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+        sources = resp.json().get("sources", [])
+        if sources:
+            ctx["source_id"] = sources[0].get("id")
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_source_detail():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    src_id = ensure_source_id()
+    if not src_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/{src_id}"
+    print(f"\n🚀 请求: GET {url}")
+    try:
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_get_source_text():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    src_id = ensure_source_id()
+    if not src_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/{src_id}/text"
+    print(f"\n🚀 请求: GET {url}")
+    try:
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_wait_sources():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/wait"
+    print(f"\n🚀 请求: POST {url}")
+    try:
+        resp = httpx.post(url, headers=get_headers(), json={"timeout": 60.0}, timeout=60.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_configure_chat():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/chat/configure"
+    print(f"\n🚀 请求: POST {url} (自定义 Persona)")
+    payload = {
+        "chat_mode": None,
+        "goal": "你是一个深空探索的领航员，请用富有科幻感和冷酷理性的语气回答问题。",
+        "response_length": "short"
     }
     try:
-        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/chat/configure", headers=headers, json=config_payload, timeout=20.0)
-        if resp.status_code == 200:
-            print("✅ 对话行为配置成功（已更新为 concise 模式）！")
-        else:
-            print(f"❌ 配置失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        resp = httpx.post(url, headers=get_headers(), json=payload, timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 9. 测试获取建议提示词
-    # ----------------------------------------------------
-    wait_for_user("9. 获取引导提问建议提示词 (GET /v1/notebooks/{id}/suggested-prompts)")
+def cmd_suggested_prompts():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/suggested-prompts"
+    print(f"\n🚀 请求: GET {url}")
     try:
-        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/suggested-prompts", headers=headers, timeout=20.0)
-        if resp.status_code == 200:
-            suggestions = resp.json().get("suggestions", [])
-            print("✅ 获取建议提示词成功！建议提问如下:")
-            for index, sug in enumerate(suggestions[:3]): # 仅打印前3个
-                print(f"   [{index + 1}] 提示标题: {sug.get('title')}")
-        else:
-            print(f"❌ 获取建议提示词失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 10. 测试进行流式对话 (Chat)
-    # ----------------------------------------------------
-    wait_for_user("10. 发起流式对话测试 (POST /v1/notebooks/{id}/chat)")
-    chat_payload = {
-        "question": "请帮我分别总结一下深空探测和引力波这两个文档的主题内容。"
-    }
-    chat_url = f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/chat"
-    print("🚀 正在发起对话，等待网关流式 (SSE Stream) 返回结果:")
+def cmd_chat_stream():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/chat"
+    question = input("💬 请输入提问内容 (留空默认随机): ").strip()
+    if not question:
+        question = "请用一句话告诉我，引力波是如何被爱因斯坦预言的？"
+    payload = {"question": question}
+    print(f"\n🚀 请求: POST {url}")
     print("-" * 60)
     try:
-        with httpx.stream("POST", chat_url, json=chat_payload, headers=headers, timeout=60.0) as r:
+        with httpx.stream("POST", url, json=payload, headers=get_headers(), timeout=60.0) as r:
             if r.status_code == 200:
                 for line in r.iter_lines():
                     if not line:
@@ -228,139 +372,260 @@ def test_api():
         print(f"\n❌ 流式交互异常: {e}")
     print("-" * 60)
 
-    # ----------------------------------------------------
-    # 11. 测试创建笔记 (Note)
-    # ----------------------------------------------------
-    wait_for_user("11. 创建测试笔记 (POST /v1/notebooks/{id}/notes)")
-    note_payload = {
-        "title": "我的航天梦笔记",
-        "content": "探索引力波 and 深空宇宙是人类未来的终极使命。"
+def cmd_create_note():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/notes"
+    print(f"\n🚀 请求: POST {url}")
+    payload = {
+        "title": "量子力学新脑洞",
+        "content": "波粒二象性证明了在微观尺度下时空并非连续的。"
     }
     try:
-        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes", headers=headers, json=note_payload, timeout=20.0)
+        resp = httpx.post(url, headers=get_headers(), json=payload, timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
         if resp.status_code in (200, 201):
-            data = resp.json()
-            temp_note_id = data.get("id") or (data.get("note", {}).get("id"))
-            print(f"✅ 笔记创建成功！笔记标题: {data.get('title') or (data.get('note', {}).get('title'))} | ID: {temp_note_id}")
-        else:
-            print(f"❌ 创建笔记失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            ctx["note_id"] = resp.json().get("id") or resp.json().get("note", {}).get("id")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 12. 测试列出该笔记本的全部笔记
-    # ----------------------------------------------------
-    wait_for_user("12. 获取笔记列表 (GET /v1/notebooks/{id}/notes)")
+def cmd_list_notes():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/notes"
+    print(f"\n🚀 请求: GET {url}")
     try:
-        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes", headers=headers, timeout=20.0)
-        if resp.status_code == 200:
-            notes_list = resp.json().get("notes", [])
-            print("✅ 获取笔记列表成功！当前笔记本的所有笔记:")
-            for index, nt in enumerate(notes_list):
-                print(f"   [{index + 1}] 标题: {nt.get('title')} | ID: {nt.get('id')}")
-        else:
-            print(f"❌ 获取笔记列表失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+        notes = resp.json().get("notes", [])
+        if notes:
+            ctx["note_id"] = notes[0].get("id")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 13. 测试修改笔记 (Update Note)
-    # ----------------------------------------------------
-    wait_for_user("13. 修改测试笔记内容 (PUT /v1/notebooks/{id}/notes/{note_id})")
-    update_note_payload = {
-        "title": "我的航天梦笔记(已修改)",
-        "content": "修改后的内容：宇宙的尽头不仅是引力波，还有无尽的奥秘待发掘。"
+def cmd_update_note():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    nt_id = ensure_note_id()
+    if not nt_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/notes/{nt_id}"
+    print(f"\n🚀 请求: PUT {url}")
+    payload = {
+        "title": "量子力学新脑洞(已修改)",
+        "content": "修改后的内容：宇宙的微观底层可能完全是由信息编码构成的。"
     }
     try:
-        resp = httpx.put(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes/{temp_note_id}", headers=headers, json=update_note_payload, timeout=20.0)
-        if resp.status_code == 200:
-            print("✅ 笔记修改成功！")
-        else:
-            print(f"❌ 笔记修改失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        resp = httpx.put(url, headers=get_headers(), json=payload, timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 14. 测试获取共享状态 (Share API)
-    # ----------------------------------------------------
-    wait_for_user("14. 获取共享状态与链接详情 (GET /v1/notebooks/{id}/share)")
+def cmd_get_share():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/share"
+    print(f"\n🚀 请求: GET {url}")
     try:
-        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/share", headers=headers, timeout=20.0)
-        if resp.status_code == 200:
-            data = resp.json()
-            print("✅ 获取共享成功！当前共享状态详情:")
-            print(f"   - 所有人是否可访问: {data.get('public_access', '未知')}")
-            print(f"   - 共享用户数量: {len(data.get('shared_users', []))}")
-        else:
-            print(f"❌ 获取共享失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        resp = httpx.get(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 15. 测试后台异步音频/报告生成物 (Artifacts API)
-    # ----------------------------------------------------
-    wait_for_user("15. 发起异步研究报告生成 (POST /v1/notebooks/{id}/artifacts)")
-    artifact_payload = {
-        "type": "report",
-        "report_format": "briefing-doc",
-        "instructions": "帮我把刚才上传的所有文档提炼为一份简短的高层研究简报。"
+def cmd_generate_artifact():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/artifacts"
+    print(f"\n🚀 请求: POST {url}")
+    payload = {
+        "type": "quiz",
+        "quantity": "standard",
+        "difficulty": "medium",
+        "instructions": "出一份关于深空探测历史的小测验卷。"
     }
     try:
-        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/artifacts", headers=headers, json=artifact_payload, timeout=20.0)
+        resp = httpx.post(url, headers=get_headers(), json=payload, timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
         if resp.status_code in (200, 202):
-            data = resp.json()
-            temp_task_id = data.get("task_id")
-            print(f"✅ 发起异步报告生成成功！生成任务任务 ID: {temp_task_id}")
-        else:
-            print(f"❌ 生成报告失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            ctx["task_id"] = resp.json().get("task_id")
     except Exception as e:
-        print(f"❌ 网络异常: {e}")
+        print(f"❌ 异常: {e}")
 
-    # ----------------------------------------------------
-    # 16. 测试删除测试笔记 (Delete Note)
-    # ----------------------------------------------------
-    if temp_note_id:
-        wait_for_user("16. 删除临时笔记 (DELETE /v1/notebooks/{id}/notes/{note_id})")
-        try:
-            resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes/{temp_note_id}", headers=headers, timeout=20.0)
-            if resp.status_code in (200, 204):
-                print("✅ 临时笔记删除成功！")
+def cmd_delete_note():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    nt_id = ensure_note_id()
+    if not nt_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/notes/{nt_id}"
+    print(f"\n🚀 请求: DELETE {url}")
+    try:
+        resp = httpx.delete(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        if resp.status_code in (200, 204):
+            print("✅ 删除成功！")
+            ctx["note_id"] = None
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_delete_source():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    src_id = ensure_source_id()
+    if not src_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}/sources/{src_id}"
+    print(f"\n🚀 请求: DELETE {url}")
+    try:
+        resp = httpx.delete(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        if resp.status_code in (200, 204):
+            print("✅ 删除成功！")
+            ctx["source_id"] = None
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+def cmd_delete_notebook():
+    nb_id = ensure_notebook_id()
+    if not nb_id: return
+    url = f"{BASE_URL}/v1/notebooks/{nb_id}"
+    print(f"\n🚀 请求: DELETE {url}")
+    try:
+        resp = httpx.delete(url, headers=get_headers(), timeout=20.0)
+        print(f"状态码: {resp.status_code}")
+        if resp.status_code in (200, 204):
+            print("✅ 删除成功！")
+            ctx["notebook_id"] = None
+    except Exception as e:
+        print(f"❌ 异常: {e}")
+
+# ----------------------------------------------------
+# 0. 一键全流程闭环自动化测试
+# ----------------------------------------------------
+def run_pipeline():
+    print("\n🌟 开始执行全流程闭环自动化流水线测试 🌟")
+    
+    # 1. 创建临时笔记本
+    print("\n[Step 1] 创建临时笔记本...")
+    create_payload = {"title": f"AutoPipeline_{int(time.time())}"}
+    try:
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks", headers=get_headers(), json=create_payload, timeout=20.0)
+        if resp.status_code not in (200, 201):
+            print(f"❌ 管道阻断：创建笔记本失败: {resp.text}")
+            return
+        nb_id = resp.json().get("id")
+        print(f"✅ 创建成功 ID: {nb_id}")
+    except Exception as e:
+        print(f"❌ 网络错误: {e}")
+        return
+
+    try:
+        # 2. 上传文本来源
+        print("\n[Step 2] 添加自定义文本来源...")
+        source_payload = {"title": "自闭环测试文档", "text": "光速是宇宙的限制，没有任何静止质量的物体能够超过光速。这一规律限制了星际航行。"}
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{nb_id}/sources/text", headers=get_headers(), json=source_payload, timeout=25.0)
+        print(f"   状态码: {resp.status_code}")
+
+        # 3. 配置对话 Persona
+        print("\n[Step 3] 配置对话 System Prompt Persona...")
+        config_payload = {"chat_mode": None, "goal": "你是一个严谨的物理学家，回答简短且充满物理学符号。"}
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{nb_id}/chat/configure", headers=get_headers(), json=config_payload, timeout=20.0)
+        print(f"   状态码: {resp.status_code}")
+
+        # 4. 进行对话
+        print("\n[Step 4] 发起流式对话提问...")
+        chat_payload = {"question": "超光速旅行在目前物理学中为什么是不可能的？"}
+        with httpx.stream("POST", f"{BASE_URL}/v1/notebooks/{nb_id}/chat", json=chat_payload, headers=get_headers(), timeout=60.0) as r:
+            if r.status_code == 200:
+                for line in r.iter_lines():
+                    if line.startswith("data:"):
+                        data_str = line[5:].strip()
+                        if data_str == "[DONE]": break
+                        try:
+                            chunk = json.loads(data_str).get("text", "")
+                            if chunk:
+                                sys.stdout.write(chunk)
+                                sys.stdout.flush()
+                        except Exception: pass
+                print()
             else:
-                print(f"❌ 笔记删除失败！状态码: {resp.status_code}, 返回: {resp.text}")
-        except Exception as e:
-            print(f"❌ 网络异常: {e}")
+                print(f"❌ 对话失败: {r.status_code}")
 
-    # ----------------------------------------------------
-    # 17. 测试删除所有的文档来源
-    # ----------------------------------------------------
-    wait_for_user("17. 批量清理临时来源文档 (DELETE /v1/notebooks/{id}/sources/{source_id})")
-    for s_id in (temp_source_id, temp_file_source_id):
-        if not s_id:
-            continue
-        try:
-            resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources/{s_id}", headers=headers, timeout=20.0)
-            if resp.status_code in (200, 204):
-                print(f"   - 来源 ID {s_id} 删除成功！")
+        # 5. 创建笔记
+        print("\n[Step 5] 在笔记本中创建笔记...")
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{nb_id}/notes", headers=get_headers(), json={"title": "管道笔记", "content": "测试数据"}, timeout=20.0)
+        print(f"   状态码: {resp.status_code}")
+
+    finally:
+        # 6. 数据销毁闭环
+        print("\n[Step 6] 销毁临时创建的笔记本，还原数据...")
+        resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{nb_id}", headers=get_headers(), timeout=20.0)
+        print(f"   删除状态码: {resp.status_code}")
+        print("🎉 自动化流水线闭环测试圆满完成！")
+
+# ----------------------------------------------------
+# 菜单主入口
+# ----------------------------------------------------
+def main_menu():
+    menu_options = {
+        "0": ("一键运行自动化流水线闭环测试 (零污染流程)", run_pipeline),
+        "1": ("获取笔记本列表 (GET /v1/notebooks)", cmd_list_notebooks),
+        "2": ("创建笔记本 (POST /v1/notebooks)", cmd_create_notebook),
+        "3": ("重命名笔记本 (PATCH /v1/notebooks/{id})", cmd_rename_notebook),
+        "4": ("获取笔记本详情 (GET /v1/notebooks/{id})", cmd_notebook_detail),
+        "5": ("添加文本来源 (POST /v1/notebooks/{id}/sources/text)", cmd_add_text_source),
+        "6": ("上传物理文件来源 (POST /v1/notebooks/{id}/sources/file)", cmd_add_file_source),
+        "7": ("挂载网页 URL 来源 (POST /v1/notebooks/{id}/sources/url)", cmd_add_url_source),
+        "8": ("批量挂载 URL 来源 (POST /v1/notebooks/{id}/sources/batch)", cmd_add_batch_urls),
+        "9": ("获取来源列表 (GET /v1/notebooks/{id}/sources)", cmd_list_sources),
+        "10": ("获取来源解析详情 (GET /v1/notebooks/{id}/sources/{src_id})", cmd_source_detail),
+        "11": ("获取文档来源脱水文本 (GET /v1/notebooks/{id}/sources/{src_id}/text)", cmd_get_source_text),
+        "12": ("同步阻塞等待文档就绪 (POST /v1/notebooks/{id}/sources/wait)", cmd_wait_sources),
+        "13": ("配置对话行为 (自定义 Persona/Goal) (POST /v1/notebooks/{id}/chat/configure)", cmd_configure_chat),
+        "14": ("获取引导提问建议词 (GET /v1/notebooks/{id}/suggested-prompts)", cmd_suggested_prompts),
+        "15": ("发起流式对话测试 (POST /v1/notebooks/{id}/chat)", cmd_chat_stream),
+        "16": ("创建测试笔记 (POST /v1/notebooks/{id}/notes)", cmd_create_note),
+        "17": ("获取笔记列表 (GET /v1/notebooks/{id}/notes)", cmd_list_notes),
+        "18": ("修改测试笔记内容 (PUT /v1/notebooks/{id}/notes/{nt_id})", cmd_update_note),
+        "19": ("获取共享状态与链接详情 (GET /v1/notebooks/{id}/share)", cmd_get_share),
+        "20": ("发起异步测验工件生成 (POST /v1/notebooks/{id}/artifacts)", cmd_generate_artifact),
+        "21": ("删除临时笔记 (DELETE /v1/notebooks/{id}/notes/{nt_id})", cmd_delete_note),
+        "22": ("删除临时来源文档 (DELETE /v1/notebooks/{id}/sources/{src_id})", cmd_delete_source),
+        "23": ("清理删除测试笔记本 (DELETE /v1/notebooks/{id})", cmd_delete_notebook),
+    }
+
+    while True:
+        print_ctx()
+        print("💡 请输入选项前的数字执行测试 (输入 q 退出调试):")
+        # 2列排序输出
+        keys = list(menu_options.keys())
+        for idx in range(0, len(keys), 2):
+            k1 = keys[idx]
+            n1 = menu_options[k1][0]
+            col1 = f"[{k1:>2}] {n1:<65}"
+            if idx + 1 < len(keys):
+                k2 = keys[idx + 1]
+                n2 = menu_options[k2][0]
+                col2 = f"[{k2:>2}] {n2}"
+                print(col1 + col2)
             else:
-                print(f"   - 来源 ID {s_id} 删除失败！状态码: {resp.status_code}")
-        except Exception as e:
-            print(f"   - 删除 ID {s_id} 出现异常: {e}")
+                print(col1)
 
-    # ----------------------------------------------------
-    # 18. 测试删除临时测试笔记本 (数据闭环清理)
-    # ----------------------------------------------------
-    if temp_notebook_id:
-        wait_for_user("18. 清理删除临时测试笔记本 (DELETE /v1/notebooks/{id})")
-        try:
-            resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}", headers=headers, timeout=20.0)
-            if resp.status_code in (200, 204):
-                print("✅ 临时测试笔记本清理完毕，测试流完美闭环！")
-            else:
-                print(f"❌ 清理笔记本失败！状态码: {resp.status_code}, 返回: {resp.text}")
-        except Exception as e:
-            print(f"❌ 网络异常: {e}")
-
-    print("\n🎉 恭喜！NotebookLM 网关全部核心 18 项进阶/基础业务 API 联通性测试均一次性顺利通过！")
+        choice = input("\n👉 请选择输入: ").strip()
+        if choice.lower() == 'q':
+            print("👋 已退出 API 调试主控台。")
+            break
+        
+        if choice in menu_options:
+            print("\n" + "*" * 40)
+            print(f"🎬 正在执行: {menu_options[choice][0]}")
+            print("*" * 40)
+            menu_options[choice][1]()
+            input("\n按下 【回车键/Enter】 返回主菜单...")
+        else:
+            print("❌ 无效的输入，请重新选择！")
 
 if __name__ == "__main__":
-    test_api()
+    main_menu()

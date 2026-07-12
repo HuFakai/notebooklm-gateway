@@ -3,9 +3,10 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "NotebookLM Gateway",
   description: "自包含、支持多账户动态路由的 Google NotebookLM 外部 API 网关服务",
-  base: "/notebooklm-gateway/", // 如果是部署到 github.io/notebooklm-gateway
+  base: "/notebooklm-gateway/", // 部署到 github.io/notebooklm-gateway
   themeConfig: {
     logo: '/logo.png',
+    outline: 'deep', // 让右侧大纲完美展示 h2 & h3 (甚至h4)
     nav: [
       { text: '首页', link: '/' },
       { text: 'API 接口文档', link: '/api' },
@@ -13,10 +14,72 @@ export default defineConfig({
     ],
     sidebar: [
       {
-        text: '使用指引',
+        text: '📖 使用指引',
         items: [
-          { text: '快速开始与部署', link: '/' },
-          { text: 'API 接口规范', link: '/api' }
+          { text: '快速开始与部署', link: '/' }
+        ]
+      },
+      {
+        text: '🔒 网关管理 API',
+        items: [
+          { text: '1.1 一键同步凭证', link: '/api#_1-1-一键同步-上传客户端凭证' },
+          { text: '1.2 账户列表与管理', link: '/api#_1-2-列出所有托管账户' }
+        ]
+      },
+      {
+        text: '🌐 系统与元数据 API',
+        items: [
+          { text: '2.1 元数据与健康 Probe', link: '/api#_2-1-系统与元数据-system-meta' }
+        ]
+      },
+      {
+        text: '📚 笔记本管理 API',
+        items: [
+          { text: '2.2 笔记本 CRUD 规范', link: '/api#_2-2-笔记本管理-notebooks' }
+        ]
+      },
+      {
+        text: '🗂️ 文档来源 API (Sources)',
+        items: [
+          { text: '2.3.1 文本与文件导入', link: '/api#_2-3-1-添加自定义文本来源' },
+          { text: '2.3.2 网页与 Drive 挂载', link: '/api#_2-3-3-添加网页-url-来源' },
+          { text: '2.3.3 批量导入与 Rename', link: '/api#_2-3-5-批量导入网页来源' },
+          { text: '2.3.4 获取正文与同步 Wait', link: '/api#_2-3-7-获取文档来源的脱水正文文本' }
+        ]
+      },
+      {
+        text: '💬 智能对话 API (Chat)',
+        items: [
+          { text: '2.4.1 SSE 流式对话', link: '/api#_2-4-3-发起对话-支持-sse-流式返回' },
+          { text: '2.4.2 自定义 Persona 设定', link: '/api#_2-4-1-配置对话行为-preset' },
+          { text: '2.4.3 引导提问建议词', link: '/api#_2-4-2-获取引导提问的建议提示词' }
+        ]
+      },
+      {
+        text: '🔍 深度探索 API (Research)',
+        items: [
+          { text: '2.5 深度搜索与导入', link: '/api#_2-5-1-启动研究会话' }
+        ]
+      },
+      {
+        text: '📝 笔记管理 API (Notes)',
+        items: [
+          { text: '2.6 笔记增删改查', link: '/api#_2-6-1-创建笔记' }
+        ]
+      },
+      {
+        text: '🎨 智能工件生成 API (Studio)',
+        items: [
+          { text: '2.7.1 异步生成 (音频/简报/Quiz等)', link: '/api#_2-7-1-发起异步生成物构建' },
+          { text: '2.7.2 任务轮询与重试', link: '/api#_2-7-3-轮询生成任务进度与状态' },
+          { text: '2.7.3 下载生成物 (MP3/PDF)', link: '/api#_2-7-7-下载生成的二进制媒体文件-如音频或幻灯片-pdf' }
+        ]
+      },
+      {
+        text: '👥 共享与协作 API (Share)',
+        items: [
+          { text: '2.8.1 共享状态与公开分享', link: '/api#_2-8-1-获取共享状态' },
+          { text: '2.8.2 协作者添加与移除', link: '/api#_2-8-3-添加协作者' }
         ]
       }
     ],

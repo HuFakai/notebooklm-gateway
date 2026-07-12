@@ -234,7 +234,71 @@
     }
     ```
 
-#### 2.3.3 获取文档来源列表
+#### 2.3.3 添加网页 URL 来源
+*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/url`
+*   **请求 Body (JSON)**：
+    ```json
+    {
+      "url": "https://example.com/page",
+      "allow_internal": false
+    }
+    ```
+*   **返回示例**：
+    ```json
+    {
+      "id": "9f095783-9acc-4f0f-88f3-54d32f0033aa",
+      "title": "网页抓取标题"
+    }
+    ```
+
+#### 2.3.4 添加 Google Drive 文档来源
+*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/drive`
+*   **请求 Body (JSON)**：
+    ```json
+    {
+      "document_id": "1A2B3C4D...",
+      "mime_type": "google-doc", // 可填: google-doc / google-sheet / pdf 等
+      "title": "可选的自定义文件标题"
+    }
+    ```
+*   **返回示例**：
+    ```json
+    {
+      "id": "9f095783-9acc-4f0f-88f3-54d32f0044bb",
+      "title": "可选的自定义文件标题"
+    }
+    ```
+
+#### 2.3.5 批量导入网页来源
+*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/batch`
+*   **说明**：最多支持在一次请求中并行拉取并录入 20 个 URL。
+*   **请求 Body (JSON)**：
+    ```json
+    {
+      "urls": [
+        "https://example.com/page1",
+        "https://example.com/page2"
+      ],
+      "allow_internal": false
+    }
+    ```
+*   **返回示例**：
+    ```json
+    {
+      "imported": [
+        {
+          "id": "src_12345a",
+          "title": "页面1"
+        },
+        {
+          "id": "src_12345b",
+          "title": "页面2"
+        }
+      ]
+    }
+    ```
+
+#### 2.3.6 获取文档来源列表
 *   **方法/路径**：`GET /v1/notebooks/{notebook_id}/sources`
 *   **返回示例**：
     ```json
@@ -249,7 +313,66 @@
     }
     ```
 
-#### 2.3.4 删除特定文档来源
+#### 2.3.7 获取特定文档来源的详情/解析状态
+*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/sources/{source_id}`
+*   **返回示例**：
+    ```json
+    {
+      "id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
+      "title": "深空探测技术简史",
+      "status": "ready", // pending / ready / failed
+      "word_count": 1420
+    }
+    ```
+
+#### 2.3.8 获取文档来源的脱水正文文本
+*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/sources/{source_id}/text`
+*   **用途**：获取已上传文档被 Google 解析去噪后的原始纯文本（脱水 Markdown）。
+*   **返回示例**：
+    ```json
+    {
+      "notebook_id": "c725a1a9...",
+      "source_id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
+      "text": "# 深空探测技术简史\n深空探测是指航天器在距离地球200万公里以上的空间..."
+    }
+    ```
+
+#### 2.3.9 同步阻塞等待文档来源就绪
+*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/wait`
+*   **用途**：在添加文档后，挂起请求等待其在 Google 云端完成全文解析索引（避免未就绪时发起对话报错）。
+*   **请求 Body (JSON)**：
+    ```json
+    {
+      "source_ids": ["7f085783-9acc-4f0f-88f3-54d32f0011e8"], // 留空则等待全部来源就绪
+      "timeout": 120.0, // 超时时间（秒）
+      "interval": 1.0 // 轮询间隔（秒）
+    }
+    ```
+*   **返回示例**：
+    ```json
+    {
+      "ready": true,
+      "source_ids": ["7f085783-9acc-4f0f-88f3-54d32f0011e8"]
+    }
+    ```
+
+#### 2.3.10 重命名来源标题
+*   **方法/路径**：`PATCH /v1/notebooks/{notebook_id}/sources/{source_id}`
+*   **请求 Body (JSON)**：
+    ```json
+    {
+      "title": "全新改写后的参考文件名称"
+    }
+    ```
+*   **返回示例**：
+    ```json
+    {
+      "id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
+      "title": "全新改写后的参考文件名称"
+    }
+    ```
+
+#### 2.3.11 删除特定文档来源
 *   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/sources/{source_id}`
 *   **返回状态**：`204 No Content`
 
@@ -257,13 +380,22 @@
 
 ### 2.4 智能对话与配置 (Chat)
 
-#### 2.4.1 配置对话行为 / Preset
+#### 2.4.1 配置对话行为 / Preset (含自定义 Persona/Goal 设定)
 *   **方法/路径**：`POST /v1/notebooks/{notebook_id}/chat/configure`
+*   **说明**：支持选用 predefined 预设，或使用 `"goal"` 来直接传递自由意志的个性化 System Prompt 指令！
 *   **请求 Body (JSON)**：
-    *   `chat_mode`: 预设模式 (`default` / `learning-guide` / `concise` / `detailed`)
+    *   *方式 A：经典预设模式*
     ```json
     {
-      "chat_mode": "concise"
+      "chat_mode": "concise" // default / learning-guide / concise / detailed
+    }
+    ```
+    *   *方式 B：自定义 Persona 设定*
+    ```json
+    {
+      "chat_mode": null,
+      "goal": "你是一个深空探索的领航员，请用富有科幻感和冷酷理性的语气回答问题。",
+      "response_length": "short" // short / default / long
     }
     ```
 *   **返回示例**：
@@ -444,15 +576,24 @@
 
 #### 2.7.1 发起异步生成物构建
 *   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts`
-*   **请求 Body (JSON)**：
-    *   `type`: 生成类型 (`audio` [播客音频] / `video` [视频] / `slide-deck` [幻灯片] / `quiz` [测验] / `flashcards` [闪卡] / `infographic` [信息图] / `data-table` [数据表格] / `mind-map` [脑图] / `report` [研究简报])
-    *   `report_format`: 报告格式，默认为 `briefing-doc`
-    *   `instructions`: 给 AI 的生成指示指令
+*   **说明**：向 NotebookLM Studio 发起构建指令，此操作为非阻塞（异步），会直接秒级返回任务 ID，您可以稍后轮询任务进度。
+*   **请求 Body (JSON) 详细选项规范**：
+    *   `type`: 生成类型 (`audio` [音频播客] / `video` [视频] / `slide-deck` [幻灯片] / `quiz` [测验] / `flashcards` [闪卡] / `infographic` [信息图] / `data-table` [数据表格] / `mind-map` [脑图] / `report` [研究简报])
+    *   不同类型专属的可选参数：
+        *   `audio` (播客) -> `audio_format` (`deep-dive` / `brief` / `critique` / `debate`), `audio_length` (`short` / `default` / `long`)
+        *   `video` (视频) -> `video_format` (`explainer` / `brief` / `cinematic` / `short`), `style` (`auto` / `custom` / `watercolor` / `anime` 等)
+        *   `slide-deck` (幻灯片) -> `deck_format` (`detailed` / `presenter`), `deck_length` (`default` / `short`)
+        *   `quiz` (测验) & `flashcards` (闪卡) -> `quantity` (`fewer` / `standard` / `more`), `difficulty` (`easy` / `medium` / `hard`)
+        *   `infographic` (信息图) -> `orientation` (`landscape` / `portrait` / `square`), `detail` (`concise` / `standard` / `detailed`), `style`
+        *   `mind-map` (脑图) -> `map_kind` (`interactive` / `note-backed`)
+        *   `report` (研究简报) -> `report_format` (`briefing-doc` / `study-guide` / `blog-post` / `custom`)
+    *   *示例 (一键生成高品质答卷测验)*：
     ```json
     {
-      "type": "report",
-      "report_format": "briefing-doc",
-      "instructions": "帮我把目前的所有文档提炼为一份高层研究简报。"
+      "type": "quiz",
+      "quantity": "standard",
+      "difficulty": "hard",
+      "instructions": "出一份关于量子纠缠的硬核单选题测试卷。"
     }
     ```
 *   **返回示例**：
