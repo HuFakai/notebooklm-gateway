@@ -3,18 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <title>NotebookLM Gateway 控制台</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #090b11;
-            --card-bg: rgba(18, 22, 35, 0.6);
-            --text: #f3f4f6;
-            --text-muted: #9ca3af;
-            --primary: #5865f2;
-            --primary-hover: #4752c4;
+            --bg: #070913;
+            --card-bg: rgba(13, 17, 30, 0.7);
+            --card-hover: rgba(20, 26, 45, 0.85);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
             --success: #10b981;
-            --danger: #ef4444;
-            --border: rgba(255, 255, 255, 0.08);
+            --danger: #f43f5e;
+            --warning: #f59e0b;
+            --border: rgba(255, 255, 255, 0.05);
+            --border-hover: rgba(255, 255, 255, 0.12);
         }
         * {
             box-sizing: border-box;
@@ -30,14 +33,17 @@
             flex-direction: column;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(88, 101, 242, 0.12) 0, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0, transparent 50%);
+                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.15) 0, transparent 45%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0, transparent 45%);
+            background-attachment: fixed;
         }
+        
+        /* 导航栏 */
         header {
-            backdrop-filter: blur(12px);
-            background: rgba(9, 11, 17, 0.7);
+            backdrop-filter: blur(16px);
+            background: rgba(7, 9, 19, 0.75);
             border-bottom: 1px solid var(--border);
-            padding: 1.2rem 2rem;
+            padding: 1rem 3rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -48,60 +54,69 @@
         .logo {
             display: flex;
             align-items: center;
-            gap: 0.8rem;
+            gap: 0.6rem;
             font-weight: 700;
-            font-size: 1.4rem;
-            letter-spacing: -0.025em;
-            background: linear-gradient(135deg, #fff 0%, var(--text-muted) 100%);
+            font-size: 1.35rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         .logo span {
-            background: linear-gradient(135deg, var(--primary) 0%, #a5b4fc 100%);
-            padding: 0.3rem 0.6rem;
-            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary) 0%, #818cf8 100%);
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
             color: #fff;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            font-weight: 600;
             -webkit-text-fill-color: #fff;
+            letter-spacing: 0.05em;
         }
+        
+        /* 输入框与按钮样式 */
         input[type="password"], input[type="text"] {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 0.6rem 1rem;
+            padding: 0.7rem 1.1rem;
             color: #fff;
             font-size: 0.95rem;
             outline: none;
-            transition: all 0.2s;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
         input[type="password"]:focus, input[type="text"]:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2);
+            background: rgba(255, 255, 255, 0.07);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
         }
         button {
             background: var(--primary);
             color: #fff;
             border: none;
             border-radius: 8px;
-            padding: 0.6rem 1.2rem;
+            padding: 0.7rem 1.4rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             font-size: 0.95rem;
         }
         button:hover {
             background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+        button:active {
+            transform: translateY(0);
         }
         
-        /* 登录遮罩层 */
+        /* 登录页 */
         .login-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(9, 11, 17, 0.95);
-            backdrop-filter: blur(20px);
+            background: rgba(5, 6, 13, 0.92);
+            backdrop-filter: blur(24px);
             z-index: 1000;
             display: flex;
             align-items: center;
@@ -109,22 +124,22 @@
             transition: opacity 0.3s ease;
         }
         .login-card {
-            background: rgba(18, 22, 35, 0.8);
+            background: var(--card-bg);
             border: 1px solid var(--border);
-            padding: 3rem;
+            padding: 3rem 2.5rem;
             border-radius: 20px;
             width: 100%;
             max-width: 420px;
-            box-shadow: 0 20px 45px rgba(0,0,0,0.5);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
             text-align: center;
         }
         .login-title {
-            font-size: 1.6rem;
+            font-size: 1.65rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #fff 0%, var(--text-muted) 100%);
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -134,94 +149,128 @@
             margin-top: -0.5rem;
         }
         
+        /* 布局主体 */
         main {
             flex: 1;
             max-width: 1200px;
             width: 100%;
-            margin: 2rem auto;
+            margin: 2.5rem auto;
             padding: 0 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
         }
+        
+        /* 卡片仪表盘 */
         .stats-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 1.5rem;
-            margin-bottom: 2rem;
         }
         .stat-card {
             background: var(--card-bg);
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(12px);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
+            border-radius: 16px;
+            padding: 1.8rem;
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.6rem;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover {
+            border-color: var(--border-hover);
+            background: var(--card-hover);
         }
         .stat-label {
             font-size: 0.85rem;
+            font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         .stat-value {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: 700;
         }
-        .stat-value.success { color: var(--success); }
+        .stat-value.success { 
+            color: var(--success); 
+            text-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+        
+        /* 面板设计 */
         .panel {
             background: var(--card-bg);
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(12px);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 2rem;
-            margin-top: 1.5rem;
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        .panel:hover {
+            border-color: rgba(255, 255, 255, 0.07);
         }
         .panel-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
         }
         .panel-title {
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
         }
+        
+        /* 表格设计 */
         table {
             width: 100%;
             border-collapse: collapse;
             text-align: left;
-            margin-top: 1rem;
         }
         th, td {
-            padding: 1rem;
+            padding: 1.1rem;
             border-bottom: 1px solid var(--border);
         }
         th {
             color: var(--text-muted);
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
+            padding-bottom: 1rem;
         }
         td {
             font-size: 0.95rem;
+            vertical-align: middle;
         }
+        tr {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        tr:hover {
+            background: rgba(255, 255, 255, 0.015);
+        }
+        
+        /* 状态微章 */
         .status-badge {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.25rem 0.6rem;
+            padding: 0.3rem 0.75rem;
             border-radius: 99px;
             font-size: 0.8rem;
             font-weight: 600;
         }
         .status-badge.active {
-            background: rgba(16, 185, 129, 0.12);
+            background: rgba(16, 185, 129, 0.1);
             color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
         }
         .status-badge.expired {
-            background: rgba(239, 68, 68, 0.12);
+            background: rgba(244, 63, 94, 0.1);
             color: var(--danger);
+            border: 1px solid rgba(244, 63, 94, 0.2);
         }
         .status-dot {
             width: 6px;
@@ -229,30 +278,47 @@
             border-radius: 50%;
             background: currentColor;
         }
+        
+        /* 复制与 Key 单元格 */
         .key-cell {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
         }
+        .key-cell code {
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+        }
+        
+        /* 极简精致的按钮操作 */
         .btn-action {
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text-muted);
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
+            padding: 0.45rem 0.9rem;
+            border-radius: 8px;
             font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .btn-action:hover {
-            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--primary);
             color: #fff;
+            background: rgba(79, 70, 229, 0.1);
         }
         .btn-delete {
-            border-color: rgba(239, 68, 68, 0.3);
+            border-color: rgba(244, 63, 94, 0.25);
             color: var(--danger);
         }
         .btn-delete:hover {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ff6b6b;
+            border-color: var(--danger);
+            background: rgba(244, 63, 94, 0.15);
+            color: #ff6b8b;
         }
         .btn-logout {
             background: transparent;
@@ -260,21 +326,109 @@
             color: var(--text-muted);
         }
         .btn-logout:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
+            border-color: var(--danger);
+            background: rgba(244, 63, 94, 0.1);
+            color: #ff6b8b;
         }
+        
         .empty-state {
             text-align: center;
-            padding: 3rem 0;
+            padding: 4rem 0;
             color: var(--text-muted);
             font-size: 0.95rem;
         }
         .copy-msg {
             color: var(--success);
-            font-size: 0.8rem;
-            margin-left: 0.5rem;
+            font-size: 0.75rem;
             opacity: 0;
             transition: opacity 0.3s;
+        }
+        
+        /* 全局自定义高档模态弹窗 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 6, 13, 0.85);
+            backdrop-filter: blur(16px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-card {
+            background: rgba(13, 17, 30, 0.92);
+            border: 1px solid var(--border);
+            padding: 2.2rem 2.2rem;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 460px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #fff;
+        }
+        .modal-desc {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .modal-input-container {
+            width: 100%;
+        }
+        .modal-input-wrapper {
+            display: flex;
+            gap: 0.6rem;
+            width: 100%;
+        }
+        .modal-input-wrapper input {
+            flex: 1;
+        }
+        .btn-gen-random {
+            background-color: var(--primary) !important;
+            color: #fff !important;
+            border: none !important;
+        }
+        .btn-gen-random:hover {
+            background-color: var(--primary-hover) !important;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+        }
+        .btn-confirm {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.4rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .btn-confirm:hover {
+            background: var(--primary-hover);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { transform: translateY(12px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
         }
     </style>
 </head>
@@ -283,9 +437,27 @@
     <div id="loginOverlay" class="login-overlay">
         <div class="login-card">
             <h2 class="login-title">NotebookLM Gateway</h2>
-            <p class="login-subtitle">请输入您的管理员 Token 访问控制台</p>
+            <p class="login-subtitle">请使用您的管理员 Token 访问控制台</p>
             <input type="password" id="adminTokenInput" placeholder="管理 Token (GATEWAY_ADMIN_TOKEN)" onkeydown="if(event.key==='Enter') login()">
             <button onclick="login()">验证并登录</button>
+        </div>
+    </div>
+
+    <!-- 全局自定义高颜值 Modal 弹窗 -->
+    <div id="customModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <h3 id="modalTitle" class="modal-title">标题</h3>
+            <p id="modalDesc" class="modal-desc">描述内容</p>
+            <div id="modalInputContainer" class="modal-input-container" style="display: none;">
+                <div class="modal-input-wrapper">
+                    <input type="text" id="modalInput" placeholder="请输入...">
+                    <button id="modalBtnGen" class="btn-action btn-gen-random">🎲 随机</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="modalBtnCancel" class="btn-action">取消</button>
+                <button id="modalBtnConfirm" class="btn-confirm">确认</button>
+            </div>
         </div>
     </div>
 
@@ -324,7 +496,7 @@
                             <th>调用 API Key</th>
                             <th>会话状态</th>
                             <th>最后同步时间</th>
-                            <th>操作</th>
+                            <th style="text-align: right;">操作</th>
                         </tr>
                     </thead>
                     <tbody id="accountsTableBody">
@@ -342,18 +514,56 @@
         // 检测本地是否已有 Token
         const savedToken = localStorage.getItem('gateway_admin_token');
         if (savedToken) {
-            // 如果有，隐藏登录框并加载列表
             document.getElementById('loginOverlay').style.display = 'none';
             fetchAccounts(savedToken);
         }
 
+        // 自定义模态框调用引擎
+        function showModal({ title, desc, showInput, defaultValue, onConfirm }) {
+            const modal = document.getElementById('customModal');
+            const inputContainer = document.getElementById('modalInputContainer');
+            const input = document.getElementById('modalInput');
+            const btnGen = document.getElementById('modalBtnGen');
+            
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalDesc').innerText = desc;
+            
+            if (showInput) {
+                inputContainer.style.display = 'block';
+                input.value = defaultValue || '';
+                btnGen.onclick = () => {
+                    const hex = Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('');
+                    input.value = 'nmlg_' + hex;
+                };
+            } else {
+                inputContainer.style.display = 'none';
+            }
+            
+            modal.style.display = 'flex';
+            
+            document.getElementById('modalBtnCancel').onclick = () => {
+                modal.style.display = 'none';
+            };
+            
+            document.getElementById('modalBtnConfirm').onclick = () => {
+                modal.style.display = 'none';
+                if (showInput) {
+                    onConfirm(input.value);
+                } else {
+                    onConfirm();
+                }
+            };
+        }
+
         async function login() {
-            const token = document.getElementById('adminTokenInput').value.strip ? 
-                document.getElementById('adminTokenInput').value.strip() : 
-                document.getElementById('adminTokenInput').value.trim();
-                
+            const token = document.getElementById('adminTokenInput').value.trim();
             if (!token) {
-                alert('请输入 Token！');
+                showModal({
+                    title: '提示',
+                    desc: '请输入管理员验证 Token。',
+                    showInput: false,
+                    onConfirm: () => {}
+                });
                 return;
             }
             
@@ -362,7 +572,12 @@
                 localStorage.setItem('gateway_admin_token', token);
                 document.getElementById('loginOverlay').style.display = 'none';
             } else {
-                alert('Token 验证失败，请重新输入！');
+                showModal({
+                    title: '登录失败',
+                    desc: '管理 Token 验证失败，请重新输入！',
+                    showInput: false,
+                    onConfirm: () => {}
+                });
                 document.getElementById('adminTokenInput').value = '';
             }
         }
@@ -384,7 +599,7 @@
                 });
                 
                 if (response.status === 401) {
-                    if (!token) logout(); // 如果是自动加载且过期，退出登录
+                    if (!token) logout();
                     return false;
                 }
                 
@@ -418,6 +633,7 @@
                 
                 // 邮箱列
                 const tdEmail = document.createElement('td');
+                tdEmail.style.fontWeight = '600';
                 tdEmail.innerText = acc.email;
                 tr.appendChild(tdEmail);
 
@@ -435,19 +651,22 @@
                 const tdStatus = document.createElement('td');
                 const badge = document.createElement('span');
                 badge.className = `status-badge ${acc.status}`;
-                badge.innerHTML = `<span class="status-dot"></span>${acc.status === 'active' ? '正常' : '已过期'}`;
+                badge.innerHTML = `<span class="status-dot"></span>${acc.status === 'active' ? '正常' : '已停用'}`;
                 tdStatus.appendChild(badge);
                 tr.appendChild(tdStatus);
 
                 // 同步时间
                 const tdTime = document.createElement('td');
+                tdTime.style.color = 'var(--text-muted)';
                 tdTime.innerText = new Date(acc.updated_at).toLocaleString();
                 tr.appendChild(tdTime);
 
                 // 操作列
                 const tdActions = document.createElement('td');
+                tdActions.style.textAlign = 'right';
                 tdActions.style.display = 'flex';
                 tdActions.style.gap = '0.5rem';
+                tdActions.style.justifyContent = 'flex-end';
 
                 // 修改 Key 按钮
                 const btnKey = document.createElement('button');
@@ -476,85 +695,111 @@
         }
 
         async function updateAccountKey(id, email, currentKey) {
-            const newKey = prompt(`请输入托管邮箱 ${email} 的新 API Key:`, currentKey);
-            if (newKey === null) return; 
-            
-            const trimmed = newKey.trim();
-            if (!trimmed) {
-                alert('API Key 不能为空！');
-                return;
-            }
+            showModal({
+                title: '🔑 更新 API Key',
+                desc: `请输入为邮箱 ${email} 分配的新调用 API Key。您也可以点击右侧的🎲随机按钮生成高强度Key：`,
+                showInput: true,
+                defaultValue: currentKey,
+                onConfirm: async (newKey) => {
+                    const trimmed = newKey.trim();
+                    if (!trimmed) {
+                        showModal({
+                            title: '提示',
+                            desc: 'API Key 不能为空！',
+                            showInput: false,
+                            onConfirm: () => {}
+                        });
+                        return;
+                    }
 
-            const token = localStorage.getItem('gateway_admin_token');
-            try {
-                const response = await fetch(`/admin/api/accounts/${id}/key`, {
-                    method: 'PUT',
-                    headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ api_key: trimmed })
-                });
-                const data = await response.json();
-                if (response.status === 200 && data.ok) {
-                    alert('API Key 修改成功！');
-                    fetchAccounts();
-                } else {
-                    alert('修改失败: ' + (data.detail || data.message || '未知错误'));
+                    const token = localStorage.getItem('gateway_admin_token');
+                    try {
+                        const response = await fetch(`/admin/api/accounts/${id}/key`, {
+                            method: 'PUT',
+                            headers: { 
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ api_key: trimmed })
+                        });
+                        const data = await response.json();
+                        if (response.status === 200 && data.ok) {
+                            showModal({
+                                title: '修改成功',
+                                desc: 'API Key 变更成功，且服务端已热更新缓存生效！',
+                                showInput: false,
+                                onConfirm: () => { fetchAccounts(); }
+                            });
+                        } else {
+                            showModal({
+                                title: '修改失败',
+                                desc: '修改失败: ' + (data.detail || data.message || '未知错误'),
+                                showInput: false,
+                                onConfirm: () => {}
+                            });
+                        }
+                    } catch (e) {
+                        alert('请求异常: ' + e);
+                    }
                 }
-            } catch (e) {
-                alert('请求异常: ' + e);
-            }
+            });
         }
 
         async function toggleAccountStatus(id, email, currentStatus) {
             const nextStatus = currentStatus === 'active' ? 'expired' : 'active';
             const actionText = nextStatus === 'active' ? '激活' : '停用';
             
-            if (!confirm(`确认要将托管账号 ${email} 变更为【${actionText}】状态吗？`)) {
-                return;
-            }
-
-            const token = localStorage.getItem('gateway_admin_token');
-            try {
-                const response = await fetch(`/admin/api/accounts/${id}/status`, {
-                    method: 'PUT',
-                    headers: { 
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ status: nextStatus })
-                });
-                const data = await response.json();
-                if (response.status === 200 && data.ok) {
-                    fetchAccounts();
-                } else {
-                    alert('状态更新失败: ' + (data.detail || data.message || '未知错误'));
+            showModal({
+                title: '🔄 变更状态确认',
+                desc: `您确定要将托管账号 ${email} 变更为【${actionText}】状态吗？`,
+                showInput: false,
+                onConfirm: async () => {
+                    const token = localStorage.getItem('gateway_admin_token');
+                    try {
+                        const response = await fetch(`/admin/api/accounts/${id}/status`, {
+                            method: 'PUT',
+                            headers: { 
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ status: nextStatus })
+                        });
+                        const data = await response.json();
+                        if (response.status === 200 && data.ok) {
+                            fetchAccounts();
+                        } else {
+                            alert('状态更新失败: ' + (data.detail || data.message || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('请求异常: ' + e);
+                    }
                 }
-            } catch (e) {
-                alert('请求异常: ' + e);
-            }
+            });
         }
 
         async function deleteAccount(id, email) {
-            if (!confirm(`确认要删除托管账号 ${email} 及其关联的所有 API Key 吗？`)) {
-                return;
-            }
-            const token = localStorage.getItem('gateway_admin_token');
-            try {
-                const response = await fetch(`/admin/api/accounts/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-                if (data.ok) {
-                    fetchAccounts();
-                } else {
-                    alert('删除失败: ' + data.message);
+            showModal({
+                title: '⚠️ 确认删除',
+                desc: `您确认要删除托管账号 ${email} 及其关联的所有 API Key 吗？此操作不可逆。`,
+                showInput: false,
+                onConfirm: async () => {
+                    const token = localStorage.getItem('gateway_admin_token');
+                    try {
+                        const response = await fetch(`/admin/api/accounts/${id}`, {
+                            method: 'DELETE',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await response.json();
+                        if (data.ok) {
+                            fetchAccounts();
+                        } else {
+                            alert('删除失败: ' + data.message);
+                        }
+                    } catch (e) {
+                        alert('请求异常: ' + e);
+                    }
                 }
-            } catch (e) {
-                alert('请求异常: ' + e);
-            }
+            });
         }
 
         function copyToClipboard(text, btn) {

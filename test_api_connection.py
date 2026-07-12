@@ -25,7 +25,7 @@ def test_api():
         print(f"服务器返回内容: {resp.text}")
         return
 
-    notebooks = resp.json()
+    notebooks = resp.json().get("notebooks", [])
     print("✅ 获取成功！当前账号下的笔记本列表如下:")
     print("-" * 60)
     for index, nb in enumerate(notebooks):
