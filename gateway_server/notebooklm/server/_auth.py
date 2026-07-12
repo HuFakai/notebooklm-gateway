@@ -127,6 +127,9 @@ def _extract_bearer(authorization: str | None) -> str | None:
 
 async def require_auth(request: Request) -> None:
     """FastAPI dependency: enforce the loopback-Host + bearer-token gate."""
+    if request.method == "OPTIONS":
+        return
+        
     from gateway_server.database import DatabaseManager
     import os
     
