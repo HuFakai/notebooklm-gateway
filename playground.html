@@ -180,12 +180,7 @@
       box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
     }
 
-    /* 左侧控制区 */
-    .control-panel {
-      overflow-y: auto;
-    }
-
-    /* 优化 Tab 导航条展示 - 平铺且字号略微缩减，避免换行折叠 */
+    /* 控制区与工作流 Tab 条 */
     .tab-nav {
       display: flex;
       justify-content: space-between;
@@ -385,7 +380,6 @@
     <div class="glass-card control-panel">
       <div class="card-title">🕹️ API 控制沙盒</div>
       
-      <!-- 优化 Tab 文字字数，防止被遮挡 -->
       <div class="tab-nav">
         <button class="tab-btn active" onclick="switchTab('notebooks')">笔记本</button>
         <button class="tab-btn" onclick="switchTab('sources')">来源</button>
@@ -394,9 +388,12 @@
         <button class="tab-btn" onclick="switchTab('artifacts')">Studio</button>
       </div>
 
-      <!-- Tab: 笔记本 -->
+      <!-- Tab: 笔记本 (包含获取笔记本详情测试) -->
       <div class="tab-content active" id="tab-notebooks">
-        <button class="btn" onclick="apiListNotebooks()">📁 获取笔记本列表</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn" style="flex: 1; font-size: 0.85rem;" onclick="apiListNotebooks()">📁 列表</button>
+          <button class="btn btn-purple" style="flex: 1; font-size: 0.85rem;" onclick="apiGetNotebookDetail()">🔍 详情</button>
+        </div>
         <div style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin: 0.5rem 0;"></div>
         <div class="form-group">
           <label>笔记本名称</label>
@@ -483,7 +480,7 @@
         </div>
       </div>
 
-      <!-- Tab: Studio (完全体) -->
+      <!-- Tab: Studio -->
       <div class="tab-content" id="tab-artifacts">
         <div class="form-group">
           <label>生成工件类型 (完全体)</label>
@@ -500,7 +497,7 @@
           </select>
         </div>
 
-        <!-- 1. Audio 专有参数 -->
+        <!-- Audio 专有参数 -->
         <div id="art-audio-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
           <div class="form-group">
             <label>音频格式 (audio_format)</label>
@@ -521,7 +518,7 @@
           </div>
         </div>
 
-        <!-- 2. Slide Deck 专有参数 -->
+        <!-- Slide Deck 专有参数 -->
         <div id="art-slide-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
           <div class="form-group">
             <label>幻灯片格式 (deck_format)</label>
@@ -539,7 +536,7 @@
           </div>
         </div>
 
-        <!-- 3. Quiz & Flashcards 专有参数 -->
+        <!-- Quiz & Flashcards 专有参数 -->
         <div id="art-quiz-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
           <div class="form-group">
             <label>生成数量 (quantity)</label>
@@ -559,7 +556,7 @@
           </div>
         </div>
 
-        <!-- 4. Infographic 专有参数 -->
+        <!-- Infographic 专有参数 -->
         <div id="art-info-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
           <div class="form-group">
             <label>图片方向 (orientation)</label>
@@ -579,7 +576,7 @@
           </div>
         </div>
 
-        <!-- 5. Mind Map 专有参数 -->
+        <!-- Mind Map 专有参数 -->
         <div id="art-map-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label>脑图类型 (map_kind)</label>
@@ -590,7 +587,7 @@
           </div>
         </div>
 
-        <!-- 6. Report 专有参数 -->
+        <!-- Report 专有参数 -->
         <div id="art-report-opts" class="art-extra-opts" style="display: none; margin-bottom: 1rem; background: rgba(255,255,255,0.02); padding: 0.8rem; border-radius: 8px;">
           <div class="form-group" style="margin-bottom: 0;">
             <label>报告格式 (report_format)</label>
@@ -659,39 +656,76 @@
 
       <div style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin: 0.8rem 0;"></div>
 
-      <div class="card-title">🚀 GitHub 官方直连全自动分析工作流</div>
-      <div class="form-group">
-        <label>GitHub 项目地址 (Web URL)</label>
-        <input type="text" id="wf-github-url" value="https://github.com/HuFakai/notebooklm-gateway">
-      </div>
-      <div class="form-group">
-        <label>自定义项目分析指令</label>
-        <textarea id="wf-instructions" rows="2">请帮我用科幻和领航员的冷酷理性语气，总结该项目的核心特性，架构设计并找出潜在的技术缺陷。</textarea>
-      </div>
+      <!-- ⚡ 多工作流组合管理区 -->
+      <div class="card-title">⚙️ 组合自动化工作流 (Workflow)</div>
       
-      <button class="btn btn-purple" onclick="runWorkflow()" style="width: 100%;">🚀 启动 GitHub 官方分析工作流</button>
+      <div class="tab-nav" style="margin-bottom: 1rem;">
+        <button class="tab-btn active" id="wf-btn-github" onclick="switchWorkflowTab('github')">GitHub项目</button>
+        <button class="tab-btn" id="wf-btn-youtube" onclick="switchWorkflowTab('youtube')">YouTube视频</button>
+        <button class="tab-btn" id="wf-btn-multiweb" onclick="switchWorkflowTab('multiweb')">多网页对比</button>
+      </div>
 
+      <!-- Workflow Tab: GitHub -->
+      <div class="wf-tab-content" id="wf-tab-github">
+        <div class="form-group">
+          <label>GitHub 项目地址 (Web URL)</label>
+          <input type="text" id="wf-github-url" value="https://github.com/HuFakai/notebooklm-gateway">
+        </div>
+        <div class="form-group">
+          <label>项目分析指令</label>
+          <textarea id="wf-github-instructions" rows="2">请帮我用科幻和领航员的冷酷理性语气，总结该项目的核心特性，架构设计并找出潜在的技术缺陷。</textarea>
+        </div>
+        <button class="btn btn-purple" onclick="runGithubWorkflow()" style="width: 100%;">🚀 启动 GitHub 分析</button>
+      </div>
+
+      <!-- Workflow Tab: YouTube -->
+      <div class="wf-tab-content" style="display: none;" id="wf-tab-youtube">
+        <div class="form-group">
+          <label>YouTube 视频链接 (Web URL)</label>
+          <input type="text" id="wf-youtube-url" value="https://www.youtube.com/watch?v=kJQP7kiw5Fk">
+        </div>
+        <div class="form-group">
+          <label>视频提取与总结指令</label>
+          <textarea id="wf-youtube-instructions" rows="2">请帮我梳理本期视频的核心发言观点、核心结论大纲，并提炼发言亮点。</textarea>
+        </div>
+        <button class="btn btn-green" onclick="runYoutubeWorkflow()" style="width: 100%;">🚀 启动 YouTube 视频总结</button>
+      </div>
+
+      <!-- Workflow Tab: Multi-Web -->
+      <div class="wf-tab-content" style="display: none;" id="wf-tab-multiweb">
+        <div class="form-group">
+          <label>对比网页 URL 列表 (每行一个)</label>
+          <textarea id="wf-multi-urls" rows="3" placeholder="https://example.com/page1&#10;https://example.com/page2"></textarea>
+        </div>
+        <div class="form-group">
+          <label>深度多网页比对指令</label>
+          <textarea id="wf-multi-instructions" rows="2">对比这几篇网页文章里的观点和主张，梳理它们的异同点、数据冲突点及结论差异。</textarea>
+        </div>
+        <button class="btn btn-purple" onclick="runMultiWebWorkflow()" style="width: 100%;">🚀 启动多网页对比研究</button>
+      </div>
+
+      <!-- 工作流统一进度面板 -->
       <div style="margin-top: 1rem;">
         <div class="workflow-container">
           <div class="step-item" id="step-1">
             <div class="step-dot">1</div>
-            <div class="step-label">在云端自动创建临时笔记本</div>
+            <div class="step-label" id="step-1-label">在云端自动创建临时笔记本</div>
           </div>
           <div class="step-item" id="step-2">
             <div class="step-dot">2</div>
-            <div class="step-label">将 GitHub URL 直连上传至 Sources</div>
+            <div class="step-label" id="step-2-label">提交 URL 挂载到 Sources</div>
           </div>
           <div class="step-item" id="step-3">
             <div class="step-dot">3</div>
-            <div class="step-label">等待 Google 官方完成网页解析就绪</div>
+            <div class="step-label" id="step-3-label">等待 Google 官方云端完成解析</div>
           </div>
           <div class="step-item" id="step-4">
             <div class="step-dot">4</div>
-            <div class="step-label">流式分析项目架构与潜在缺陷</div>
+            <div class="step-label" id="step-4-label">发起流式问答完成成果提取</div>
           </div>
           <div class="step-item" id="step-5">
             <div class="step-dot">5</div>
-            <div class="step-label">将架构分析报告保存为 Notebook 笔记</div>
+            <div class="step-label" id="step-5-label">将分析报告自动保存为云端笔记</div>
           </div>
         </div>
       </div>
@@ -709,7 +743,6 @@
       if (localStorage.getItem('nml_gateway_key')) {
         document.getElementById('cfg-key').value = localStorage.getItem('nml_gateway_key');
       }
-      // 初始化展示对应参数
       adjustArtifactForm();
     };
 
@@ -724,11 +757,37 @@
 
     // 标签切换
     function switchTab(tabId) {
-      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (!btn.id.startsWith('wf-btn-')) btn.classList.remove('active');
+      });
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
       
       event.target.classList.add('active');
       document.getElementById('tab-' + tabId).classList.add('active');
+    }
+
+    // 工作流 Tab 切换
+    function switchWorkflowTab(wfId) {
+      document.querySelectorAll('[id^="wf-btn-"]').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.wf-tab-content').forEach(content => content.style.display = 'none');
+      
+      document.getElementById('wf-btn-' + wfId).classList.add('active');
+      document.getElementById('wf-tab-' + wfId).style.display = 'block';
+
+      // 调整进度条文案以适配各工作流的专业用语
+      if (wfId === 'github') {
+        document.getElementById('step-2-label').textContent = '将 GitHub URL 直连上传至 Sources';
+        document.getElementById('step-3-label').textContent = '等待 Google 官方完成网页解析就绪';
+        document.getElementById('step-4-label').textContent = '流式分析项目架构与潜在缺陷';
+      } else if (wfId === 'youtube') {
+        document.getElementById('step-2-label').textContent = '挂载 YouTube 视频 URL 至 Sources';
+        document.getElementById('step-3-label').textContent = '等待官方云端抓取完成并转录字幕';
+        document.getElementById('step-4-label').textContent = '流式提炼视频核心思想与发言要点';
+      } else if (wfId === 'multiweb') {
+        document.getElementById('step-2-label').textContent = '批量提交多网页 URLs 至 Sources';
+        document.getElementById('step-3-label').textContent = '等待所有参考网页全部就绪';
+        document.getElementById('step-4-label').textContent = '流式比对各参考资料的数据异同点';
+      }
     }
 
     // 终端日志辅助
@@ -809,6 +868,11 @@
         updateCtxUI();
         appendLog(`自动锁定并绑定第一个 Notebook ID: ${ctx.notebook_id}`);
       }
+    }
+
+    async function apiGetNotebookDetail() {
+      if (!ctx.notebook_id) return appendLog("请先指定 Notebook ID 锁定上下文", true);
+      await makeRequest('GET', `/v1/notebooks/${ctx.notebook_id}`);
     }
 
     async function apiCreateNotebook() {
@@ -1018,9 +1082,7 @@
       }
     }
 
-    // ----------------------------------------------------
     // 工件配置动态面板切换逻辑
-    // ----------------------------------------------------
     function adjustArtifactForm() {
       const type = document.getElementById('art-gen-type').value;
       
@@ -1126,68 +1188,26 @@
     }
 
     // ----------------------------------------------------
-    // 🛠️ GitHub 官方直连全自动分析工作流 (Workflow)
+    // 工作流通用逻辑封装
     // ----------------------------------------------------
-    async function runWorkflow() {
-      const gitUrl = document.getElementById('wf-github-url').value.trim();
-      const instructions = document.getElementById('wf-instructions').value.trim();
-      
-      if (!gitUrl) {
-        alert("请输入要分析的 GitHub 仓库地址！");
-        return;
-      }
-      
-      // 重置工作流可视化状态
+    function resetWorkflowUI() {
       document.querySelectorAll('.step-item').forEach(el => {
         el.className = 'step-item';
       });
-
       clearLog();
-      appendLog("🚀 启动 GitHub 项目官方直连全自动分析工作流流水线...");
+    }
 
-      // Step 1: 创建笔记本
-      setStepState(1, 'active');
-      let title = "GitHub_Analysis_" + gitUrl.substring(gitUrl.lastIndexOf('/') + 1);
-      appendLog(`[1/5] 正在创建临时分析笔记本: ${title}...`);
-      let res = await makeRequest('POST', '/v1/notebooks', { title });
-      if (!res.ok) {
-        setStepState(1, 'failed');
-        return appendLog("工作流阻断：临时笔记本创建失败！", true);
+    function setStepState(stepNum, state) {
+      const stepEl = document.getElementById(`step-${stepNum}`);
+      if (stepEl) {
+        stepEl.className = `step-item ${state}`;
       }
-      const nb_id = res.data.id;
-      ctx.notebook_id = nb_id;
-      updateCtxUI();
-      setStepState(1, 'done');
-      appendLog(`[1/5] ✅ 成功创建笔记本 ID: ${nb_id}`);
+    }
 
-      // Step 2: 挂载 URL
-      setStepState(2, 'active');
-      appendLog(`[2/5] 正在调用 URL 挂载接口上传仓库地址: ${gitUrl}...`);
-      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/url`, { url: gitUrl });
-      if (!res.ok) {
-        setStepState(2, 'failed');
-        return appendLog("工作流阻断：挂载 GitHub 地址失败！", true);
-      }
-      const src_id = res.data.id || res.data.source.id;
-      ctx.source_id = src_id;
-      updateCtxUI();
-      setStepState(2, 'done');
-      appendLog(`[2/5] ✅ 挂载成功，已分配云端来源 ID: ${src_id}`);
-
-      // Step 3: 等待就绪
-      setStepState(3, 'active');
-      appendLog(`[3/5] 正在请求同步阻塞等待 Google 官方在云端完成此 URL 网页的下载与解析...`);
-      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/wait`, { source_ids: [src_id], timeout: 180.0 });
-      if (!res.ok || !res.data.ready) {
-        setStepState(3, 'failed');
-        return appendLog("工作流阻断：同步就绪等待超时或失败！", true);
-      }
-      setStepState(3, 'done');
-      appendLog(`[3/5] ✅ Google 云端抓取成功！解析状态就绪。`);
-
-      // Step 4: 配置与对话提问
+    // 💬 公共流式对话分析提取并保存笔记的自动化逻辑
+    async function runSharedChatAndNoteFlow(nb_id, instructions, doc_type) {
       setStepState(4, 'active');
-      appendLog(`[4/5] 正在向 NotebookLM 官方发起基于项目信息的流式对话分析...`);
+      appendLog(`[4/5] 正在向 NotebookLM 官方发起基于${doc_type}的流式对话分析与内容提取...`);
       
       const cfg = saveConfig();
       const chatUrl = `${cfg.url}/v1/notebooks/${nb_id}/chat`;
@@ -1250,9 +1270,9 @@
 
       // Step 5: 保存为笔记
       setStepState(5, 'active');
-      appendLog(`[5/5] 正在将生成的架构分析报告一键另存为 NotebookLM 笔记...`);
-      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/notes`, {
-        title: "GitHub 架构分析报告",
+      appendLog(`[5/5] 正在将生成的${doc_type}分析报告一键另存为 NotebookLM 笔记...`);
+      const res = await makeRequest('POST', `/v1/notebooks/${nb_id}/notes`, {
+        title: `${doc_type} 提炼报告`,
         content: finalReportText || "分析报告生成为空。"
       });
       if (!res.ok) {
@@ -1263,15 +1283,176 @@
       updateCtxUI();
       setStepState(5, 'done');
       
-      appendLog(`\n🎉 恭喜！GitHub 直连项目全自动分析工作流流水线已完美通关！`);
+      appendLog(`\n🎉 恭喜！一键${doc_type}智能分析工作流流水线已完美通关！`);
       appendLog(`👉 您可以在浏览器直接打开 NotebookLM 官网查看永久生成的分析笔记本：${nb_id}`);
     }
 
-    function setStepState(stepNum, state) {
-      const stepEl = document.getElementById(`step-${stepNum}`);
-      if (stepEl) {
-        stepEl.className = `step-item ${state}`;
+    // ----------------------------------------------------
+    // 工作流 1: GitHub 官方直连分析
+    // ----------------------------------------------------
+    async function runGithubWorkflow() {
+      const gitUrl = document.getElementById('wf-github-url').value.trim();
+      const instructions = document.getElementById('wf-github-instructions').value.trim();
+      if (!gitUrl) return alert("请输入要分析的 GitHub 仓库地址！");
+      
+      resetWorkflowUI();
+      appendLog("🚀 启动 GitHub 项目官方直连全自动分析工作流...");
+
+      // Step 1: 创建笔记本
+      setStepState(1, 'active');
+      let title = "GitHub_Analysis_" + gitUrl.substring(gitUrl.lastIndexOf('/') + 1);
+      appendLog(`[1/5] 正在创建临时分析笔记本: ${title}...`);
+      let res = await makeRequest('POST', '/v1/notebooks', { title });
+      if (!res.ok) {
+        setStepState(1, 'failed');
+        return appendLog("工作流阻断：临时笔记本创建失败！", true);
       }
+      const nb_id = res.data.id;
+      ctx.notebook_id = nb_id;
+      updateCtxUI();
+      setStepState(1, 'done');
+      appendLog(`[1/5] ✅ 成功创建笔记本 ID: ${nb_id}`);
+
+      // Step 2: 挂载 URL
+      setStepState(2, 'active');
+      appendLog(`[2/5] 正在调用 URL 挂载接口上传仓库地址: ${gitUrl}...`);
+      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/url`, { url: gitUrl });
+      if (!res.ok) {
+        setStepState(2, 'failed');
+        return appendLog("工作流阻断：挂载 GitHub 地址失败！", true);
+      }
+      const src_id = res.data.id || res.data.source.id;
+      ctx.source_id = src_id;
+      updateCtxUI();
+      setStepState(2, 'done');
+      appendLog(`[2/5] ✅ 挂载成功，已分配云端来源 ID: ${src_id}`);
+
+      // Step 3: 等待就绪
+      setStepState(3, 'active');
+      appendLog(`[3/5] 正在请求同步阻塞等待 Google 官方在云端完成网页解析...`);
+      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/wait`, { source_ids: [src_id], timeout: 180.0 });
+      if (!res.ok || !res.data.ready) {
+        setStepState(3, 'failed');
+        return appendLog("工作流阻断：同步就绪等待超时或失败！", true);
+      }
+      setStepState(3, 'done');
+      appendLog(`[3/5] ✅ Google 云端抓取成功！解析状态就绪。`);
+
+      // 串联 Step 4 和 Step 5
+      await runSharedChatAndNoteFlow(nb_id, instructions, "GitHub项目");
+    }
+
+    // ----------------------------------------------------
+    // 工作流 2: YouTube 视频内容总结
+    // ----------------------------------------------------
+    async function runYoutubeWorkflow() {
+      const ytUrl = document.getElementById('wf-youtube-url').value.trim();
+      const instructions = document.getElementById('wf-youtube-instructions').value.trim();
+      if (!ytUrl) return alert("请输入 YouTube 视频网址！");
+
+      resetWorkflowUI();
+      appendLog("🚀 启动 YouTube 视频官方直连内容提取工作流...");
+
+      // Step 1: 创建笔记本
+      setStepState(1, 'active');
+      let title = "YT_Summary_" + Date.now();
+      appendLog(`[1/5] 正在创建视频分析笔记本: ${title}...`);
+      let res = await makeRequest('POST', '/v1/notebooks', { title });
+      if (!res.ok) {
+        setStepState(1, 'failed');
+        return appendLog("工作流阻断：笔记本创建失败！", true);
+      }
+      const nb_id = res.data.id;
+      ctx.notebook_id = nb_id;
+      updateCtxUI();
+      setStepState(1, 'done');
+      appendLog(`[1/5] ✅ 成功创建笔记本 ID: ${nb_id}`);
+
+      // Step 2: 挂载 YouTube URL
+      setStepState(2, 'active');
+      appendLog(`[2/5] 正在调用 URL 挂载接口上传 YouTube 视频地址: ${ytUrl}...`);
+      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/url`, { url: ytUrl });
+      if (!res.ok) {
+        setStepState(2, 'failed');
+        return appendLog("工作流阻断：挂载 YouTube 视频失败！", true);
+      }
+      const src_id = res.data.id || res.data.source.id;
+      ctx.source_id = src_id;
+      updateCtxUI();
+      setStepState(2, 'done');
+      appendLog(`[2/5] ✅ 挂载成功，已分配来源 ID: ${src_id}`);
+
+      // Step 3: 等待就绪 (由于转录时间可能稍长，我们增加等待超时限度)
+      setStepState(3, 'active');
+      appendLog(`[3/5] 正在同步等待 Google 官方拉取视频、转录中文字幕并完成解析就绪...`);
+      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/wait`, { source_ids: [src_id], timeout: 240.0 });
+      if (!res.ok || !res.data.ready) {
+        setStepState(3, 'failed');
+        return appendLog("工作流阻断：视频字幕转录等待超时或失败！", true);
+      }
+      setStepState(3, 'done');
+      appendLog(`[3/5] ✅ 官方云端转录并就绪成功！`);
+
+      // 串联 Step 4 和 Step 5
+      await runSharedChatAndNoteFlow(nb_id, instructions, "YouTube视频");
+    }
+
+    // ----------------------------------------------------
+    // 工作流 3: 批量多网页对比研究
+    // ----------------------------------------------------
+    async function runMultiWebWorkflow() {
+      const urlsText = document.getElementById('wf-multi-urls').value.trim();
+      const instructions = document.getElementById('wf-multi-instructions').value.trim();
+      if (!urlsText) return alert("请在多行文本框中输入至少一个网页 URL 链接！");
+
+      // 分割解析并去噪
+      const urls = urlsText.split('\n').map(u => u.trim()).filter(u => u.length > 0);
+      if (urls.length === 0) return alert("无可用的网页 URL，请重新输入！");
+
+      resetWorkflowUI();
+      appendLog(`🚀 启动批量 ${urls.length} 个多网页对比研究组合工作流...`);
+
+      // Step 1: 创建笔记本
+      setStepState(1, 'active');
+      let title = `MultiWeb_Compare_${Date.now()}`;
+      appendLog(`[1/5] 正在创建多网页研究笔记本: ${title}...`);
+      let res = await makeRequest('POST', '/v1/notebooks', { title });
+      if (!res.ok) {
+        setStepState(1, 'failed');
+        return appendLog("工作流阻断：笔记本创建失败！", true);
+      }
+      const nb_id = res.data.id;
+      ctx.notebook_id = nb_id;
+      updateCtxUI();
+      setStepState(1, 'done');
+      appendLog(`[1/5] ✅ 成功创建笔记本 ID: ${nb_id}`);
+
+      // Step 2: 批量提交
+      setStepState(2, 'active');
+      appendLog(`[2/5] 正在并行批量挂载 ${urls.length} 个目标参考网页...`);
+      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/batch`, { urls });
+      if (!res.ok) {
+        setStepState(2, 'failed');
+        return appendLog("工作流阻断：批量网页挂载失败！", true);
+      }
+      const imported = res.data.imported || [];
+      const src_ids = imported.map(item => item.id);
+      appendLog(`[2/5] ✅ 批量分发成功，分配云端 ID 数组: ${JSON.stringify(src_ids)}`);
+      setStepState(2, 'done');
+
+      // Step 3: 批量等待就绪
+      setStepState(3, 'active');
+      appendLog(`[3/5] 正在同步等待这批网页被 Google 官方云端解析并建立索引就绪...`);
+      res = await makeRequest('POST', `/v1/notebooks/${nb_id}/sources/wait`, { source_ids: src_ids, timeout: 200.0 });
+      if (!res.ok || !res.data.ready) {
+        setStepState(3, 'failed');
+        return appendLog("工作流阻断：有部分网页解析就绪超时或失败！", true);
+      }
+      setStepState(3, 'done');
+      appendLog(`[3/5] ✅ 全部对比参考网页均已就绪。`);
+
+      // 串联 Step 4 和 Step 5
+      await runSharedChatAndNoteFlow(nb_id, instructions, "多网页比对");
     }
   </script>
 </body>
