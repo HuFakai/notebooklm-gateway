@@ -88,7 +88,7 @@ class LoginWorker(QThread):
                 storage_state = f.read()
             with open(master_token_path, "r", encoding="utf-8") as f:
                 master_token_obj = json.load(f)
-                master_token = master_token_obj.get("token")
+                master_token = master_token_obj.get("master_token")
 
             self.log_signal.emit("🚀 [3/3] 正在清理本地临时运行环境缓存...")
             # 清理临时文件
