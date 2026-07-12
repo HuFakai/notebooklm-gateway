@@ -112,8 +112,14 @@ async def get_client(request: Request) -> NotebookLMClient:
     profile_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        from gateway_server.notebooklm.auth import generate_android_id
         # 写回 master_token.json 和 storage_state.json
-        master_token_data = {"token": account["master_token"]}
+        master_token_data = {
+            "version": 1,
+            "email": email,
+            "android_id": generate_android_id(),
+            "master_token": account["master_token"]
+        }
         with open(profile_dir / "master_token.json", "w") as f:
             json.dump(master_token_data, f)
             
