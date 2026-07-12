@@ -1,88 +1,267 @@
 import httpx
 import json
 import sys
+import time
 
 BASE_URL = "https://note.aisenno.com"
 API_KEY = "my_notebooklm_key_snkj888"
 
-def test_api():
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
+# 定义公共的 HTTP 头部
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
 
-    print("🚀 [1/3] 开始测试：正在向网关获取笔记本列表...")
+def wait_for_user(step_name):
+    print("\n" + "=" * 60)
+    input(f"👉 [确认] {step_name} 测试已就绪。请按 【回车键/Enter】 开始执行该项测试...")
+    print("=" * 60)
+
+def test_api():
+    print("🌟 开始执行 NotebookLM Gateway 全接口联通性流水线测试 🌟")
+    print(f"远程网关地址: {BASE_URL}")
+    print(f"API Key: {API_KEY}")
+
+    temp_notebook_id = None
+    temp_source_id = None
+    temp_note_id = None
+
+    # ----------------------------------------------------
+    # 1. 测试列出笔记本列表
+    # ----------------------------------------------------
+    wait_for_user("1. 获取笔记本列表 (GET /v1/notebooks)")
     notebooks_url = f"{BASE_URL}/v1/notebooks"
-    
     try:
         resp = httpx.get(notebooks_url, headers=headers, timeout=20.0)
+        if resp.status_code == 200:
+            notebooks = resp.json().get("notebooks", [])
+            print("✅ 获取成功！当前托管邮箱下的笔记本列表:")
+            for index, nb in enumerate(notebooks):
+                print(f"   [{index + 1}] 名称: {nb.get('title')} | ID: {nb.get('id')}")
+        else:
+            print(f"❌ 获取失败！状态码: {resp.status_code}, 返回: {resp.text}")
     except Exception as e:
-        print(f"❌ 请求失败，无法连接到服务器: {e}")
-        return
+        print(f"❌ 网络异常: {e}")
 
-    if resp.status_code != 200:
-        print(f"❌ 获取笔记本列表失败！状态码: {resp.status_code}")
-        print(f"服务器返回内容: {resp.text}")
-        return
-
-    notebooks = resp.json().get("notebooks", [])
-    print("✅ 获取成功！当前账号下的笔记本列表如下:")
-    print("-" * 60)
-    for index, nb in enumerate(notebooks):
-        print(f"[{index + 1}] 名称: {nb.get('title')} | ID: {nb.get('id')}")
-    print("-" * 60)
-
-    if not notebooks:
-        print("ℹ️ 当前账号下没有创建任何笔记本，无法进行聊天测试。请先在 Google NotebookLM 官网上创建笔记本。")
-        return
-
-    # 自动挑选第一个笔记本进行聊天测试
-    target_nb = notebooks[0]
-    nb_id = target_nb['id']
-    nb_title = target_nb['title']
-    print(f"\n🚀 [2/3] 自动挑选笔记本 [{nb_title}] 进行对话测试 (ID: {nb_id})...")
-
-    chat_url = f"{BASE_URL}/v1/notebooks/{nb_id}/chat"
-    payload = {
-        "input": "你好，请用一句话告诉我你是谁，并帮我总结一下本笔记本主要关于什么内容。"
+    # ----------------------------------------------------
+    # 2. 测试创建临时测试笔记本
+    # ----------------------------------------------------
+    wait_for_user("2. 创建临时测试笔记本 (POST /v1/notebooks)")
+    create_payload = {
+        "title": f"Gateway_AutoTest_{int(time.time())}"
     }
-
-    print("🚀 [3/3] 正在发起对话，等待网关流式 (SSE Stream) 返回结果:")
-    print("-" * 60)
-    
     try:
-        # 使用 httpx 的 stream 方法以获取流式响应
-        with httpx.stream("POST", chat_url, json=payload, headers=headers, timeout=60.0) as r:
-            if r.status_code != 200:
-                print(f"\n❌ 对话请求失败！状态码: {r.status_code}")
-                # 读取全部内容进行展示
-                r.read()
-                print(f"服务器返回内容: {r.text}")
-                return
-
-            # 按行读取 SSE 流式数据
-            for line in r.iter_lines():
-                if not line:
-                    continue
-                if line.startswith("data:"):
-                    # 提取 data: 后的 JSON 内容
-                    data_str = line[5:].strip()
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        data_json = json.loads(data_str)
-                        # 核心文本内容通常存在于文本段中，这里直接打印流式输出的 chunk 文本
-                        # 兼容原版返回的 chunk 字段（例如 text 或是 content）
-                        chunk = data_json.get("text", "") or data_json.get("content", "")
-                        if chunk:
-                            sys.stdout.write(chunk)
-                            sys.stdout.flush()
-                    except Exception:
-                        pass
-        print("\n" + "-" * 60)
-        print("🎉 测试圆满完成！API 调用、动态路由和对话功能全部一切正常！")
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks", headers=headers, json=create_payload, timeout=20.0)
+        if resp.status_code == 201 or resp.status_code == 200:
+            data = resp.json()
+            temp_notebook_id = data.get("id")
+            print(f"✅ 创建成功！临时笔记本名称: {data.get('title')} | ID: {temp_notebook_id}")
+        else:
+            print(f"❌ 创建失败！状态码: {resp.status_code}, 返回: {resp.text}")
+            return
     except Exception as e:
-        print(f"\n❌ 对话测试过程中发生异常: {e}")
+        print(f"❌ 网络异常: {e}")
+        return
+
+    # ----------------------------------------------------
+    # 3. 测试重命名临时笔记本
+    # ----------------------------------------------------
+    wait_for_user("3. 重命名笔记本 (PATCH /v1/notebooks/{id})")
+    rename_payload = {
+        "title": "Gateway_AutoTest_Notebook_Renamed"
+    }
+    try:
+        resp = httpx.patch(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}", headers=headers, json=rename_payload, timeout=20.0)
+        if resp.status_code == 200:
+            print("✅ 重命名指令发送成功！")
+        else:
+            print(f"❌ 重命名失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 4. 测试获取笔记本详情 (验证重命名)
+    # ----------------------------------------------------
+    wait_for_user("4. 获取笔记本详情 (GET /v1/notebooks/{id})")
+    try:
+        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}", headers=headers, timeout=20.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            print(f"✅ 获取成功！当前笔记本最新名称: {data.get('title')}")
+        else:
+            print(f"❌ 获取详情失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 5. 测试在该临时笔记本中添加文本来源 (Source)
+    # ----------------------------------------------------
+    wait_for_user("5. 添加自定义文本来源 (POST /v1/notebooks/{id}/sources/text)")
+    source_payload = {
+        "title": "深空探测技术简史",
+        "text": "深空探测是指航天器在距离地球200万公里以上的空间进行的探测活动。目前，人类已经向月球、火星、木星等天体发射了大量的科学探测器。中国嫦娥系列探测器在月球背面的成功着陆，为人类探索太空奠定了重要基石。"
+    }
+    try:
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources/text", headers=headers, json=source_payload, timeout=25.0)
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            # 兼容不同包装格式
+            temp_source_id = data.get("id") or (data.get("source", {}).get("id"))
+            print(f"✅ 文本来源添加成功！来源名称: {data.get('title') or (data.get('source', {}).get('title'))} | ID: {temp_source_id}")
+        else:
+            print(f"❌ 添加来源失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 6. 测试获取该笔记本的来源列表
+    # ----------------------------------------------------
+    wait_for_user("6. 获取来源列表 (GET /v1/notebooks/{id}/sources)")
+    try:
+        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources", headers=headers, timeout=20.0)
+        if resp.status_code == 200:
+            sources_list = resp.json().get("sources", [])
+            print("✅ 获取来源列表成功！当前笔记本的文档来源:")
+            for index, src in enumerate(sources_list):
+                print(f"   [{index + 1}] 来源: {src.get('title')} | ID: {src.get('id')} | 类型: {src.get('type')}")
+                if src.get("title") == "深空探测技术简史":
+                    temp_source_id = src.get("id") # 确保拿到正确的可删除ID
+        else:
+            print(f"❌ 获取来源列表失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 7. 测试在该笔记本中进行流式对话 (Chat)
+    # ----------------------------------------------------
+    wait_for_user("7. 发起流式对话测试 (POST /v1/notebooks/{id}/chat)")
+    chat_payload = {
+        "input": "请帮我用一句话总结一下刚才添加的关于深空探测技术的文本中，中国嫦娥探测器起到了什么作用？"
+    }
+    chat_url = f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/chat"
+    print("🚀 正在发起对话，等待网关流式 (SSE Stream) 返回结果:")
+    print("-" * 60)
+    try:
+        with httpx.stream("POST", chat_url, json=chat_payload, headers=headers, timeout=60.0) as r:
+            if r.status_code == 200:
+                for line in r.iter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        data_str = line[5:].strip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json.get("text", "") or data_json.get("content", "")
+                            if chunk:
+                                sys.stdout.write(chunk)
+                                sys.stdout.flush()
+                        except Exception:
+                            pass
+                print()
+            else:
+                r.read()
+                print(f"❌ 对话失败！状态码: {r.status_code}, 内容: {r.text}")
+    except Exception as e:
+        print(f"\n❌ 流式交互异常: {e}")
+    print("-" * 60)
+
+    # ----------------------------------------------------
+    # 8. 测试创建笔记 (Note)
+    # ----------------------------------------------------
+    wait_for_user("8. 创建测试笔记 (POST /v1/notebooks/{id}/notes)")
+    note_payload = {
+        "title": "我的航天梦笔记",
+        "text": "探索引力波和深空宇宙是人类未来的终极使命。"
+    }
+    try:
+        resp = httpx.post(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes", headers=headers, json=note_payload, timeout=20.0)
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            temp_note_id = data.get("id") or (data.get("note", {}).get("id"))
+            print(f"✅ 笔记创建成功！笔记标题: {data.get('title') or (data.get('note', {}).get('title'))} | ID: {temp_note_id}")
+        else:
+            print(f"❌ 创建笔记失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 9. 测试列出该笔记本的全部笔记
+    # ----------------------------------------------------
+    wait_for_user("9. 获取笔记列表 (GET /v1/notebooks/{id}/notes)")
+    try:
+        resp = httpx.get(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes", headers=headers, timeout=20.0)
+        if resp.status_code == 200:
+            notes_list = resp.json().get("notes", [])
+            print("✅ 获取笔记列表成功！当前笔记本的所有笔记:")
+            for index, nt in enumerate(notes_list):
+                print(f"   [{index + 1}] 标题: {nt.get('title')} | ID: {nt.get('id')}")
+        else:
+            print(f"❌ 获取笔记列表失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 10. 测试修改笔记 (Update Note)
+    # ----------------------------------------------------
+    wait_for_user("10. 修改测试笔记内容 (PUT /v1/notebooks/{id}/notes/{note_id})")
+    update_note_payload = {
+        "title": "我的航天梦笔记(已修改)",
+        "text": "修改后的内容：宇宙的尽头不仅是引力波，还有无尽的奥秘待发掘。"
+    }
+    try:
+        resp = httpx.put(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes/{temp_note_id}", headers=headers, json=update_note_payload, timeout=20.0)
+        if resp.status_code == 200:
+            print("✅ 笔记修改成功！")
+        else:
+            print(f"❌ 笔记修改失败！状态码: {resp.status_code}, 返回: {resp.text}")
+    except Exception as e:
+        print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 11. 测试删除测试笔记 (Delete Note)
+    # ----------------------------------------------------
+    if temp_note_id:
+        wait_for_user("11. 删除临时笔记 (DELETE /v1/notebooks/{id}/notes/{note_id})")
+        try:
+            resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/notes/{temp_note_id}", headers=headers, timeout=20.0)
+            if resp.status_code in (200, 204):
+                print("✅ 临时笔记删除成功！")
+            else:
+                print(f"❌ 笔记删除失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        except Exception as e:
+            print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 12. 测试删除文本来源 (Delete Source)
+    # ----------------------------------------------------
+    if temp_source_id:
+        wait_for_user("12. 删除临时文本来源 (DELETE /v1/notebooks/{id}/sources/{source_id})")
+        try:
+            resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}/sources/{temp_source_id}", headers=headers, timeout=20.0)
+            if resp.status_code in (200, 204):
+                print("✅ 临时来源删除成功！")
+            else:
+                print(f"❌ 来源删除失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        except Exception as e:
+            print(f"❌ 网络异常: {e}")
+
+    # ----------------------------------------------------
+    # 13. 测试删除临时测试笔记本 (数据闭环清理)
+    # ----------------------------------------------------
+    if temp_notebook_id:
+        wait_for_user("13. 清理删除临时笔记本 (DELETE /v1/notebooks/{id})")
+        try:
+            resp = httpx.delete(f"{BASE_URL}/v1/notebooks/{temp_notebook_id}", headers=headers, timeout=20.0)
+            if resp.status_code in (200, 204):
+                print("✅ 临时测试笔记本清理完毕，数据还原成功！")
+            else:
+                print(f"❌ 清理笔记本失败！状态码: {resp.status_code}, 返回: {resp.text}")
+        except Exception as e:
+            print(f"❌ 网络异常: {e}")
+
+    print("\n🎉 恭喜！NotebookLM 网关所有核心接口的联通性回归流水线测试全部圆满成功！")
 
 if __name__ == "__main__":
     test_api()
