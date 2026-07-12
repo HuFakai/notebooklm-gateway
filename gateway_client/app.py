@@ -159,6 +159,27 @@ class MainWindow(QMainWindow):
                 font-family: 'Courier New', Courier, monospace;
                 font-size: 12px;
             }
+            QMessageBox {
+                background-color: #0e111a;
+            }
+            QMessageBox QLabel {
+                color: #ffffff;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            QMessageBox QPushButton {
+                background-color: #5865f2;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 14px;
+                min-width: 60px;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #4752c4;
+            }
         """)
         self.setup_ui()
         self.captured_credentials = None
