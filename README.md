@@ -113,10 +113,13 @@ python gateway_client/build.py
 
 ## 🔑 3. 外部 API 调用说明
 
-网关完全兼容 `notebooklm-py` 的所有路由规格。你只需要把 Header 修改为：
+有关本网关服务所支持的所有管理与业务 API 接口的参数规范、请求与响应示例，请参阅：
+👉 **[API 接口介绍文档 (API.md)](file:///Users/fakaihu/Documents/project/notebooklm/API.md)**
+
+网关完全兼容 `notebooklm-py` 的所有路由规格。你只需要在请求 Header 中携带：
 `Authorization: Bearer <你为该账号分配的 api_key>`
 
-### 示例 1：获取对应账号 of 笔记本列表 (Curl)
+### 示例 1：获取对应账号的笔记本列表 (Curl)
 ```bash
 curl -X GET "https://note.aisenno.com/v1/notebooks" \
      -H "Authorization: Bearer my_custom_api_key_123"
@@ -132,7 +135,7 @@ headers = {
     "Content-Type": "application/json"
 }
 payload = {
-    "input": "请帮我总结一下这本笔记本的核心内容"
+    "question": "请帮我总结一下这本笔记本的核心内容"
 }
 
 with httpx.Client() as client:
