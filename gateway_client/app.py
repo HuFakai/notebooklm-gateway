@@ -203,7 +203,7 @@ class MainWindow(QMainWindow):
         # 网关 API 地址
         lbl_url = QLabel("远程网关 API 地址 (HTTPS 域名):")
         self.txt_url = QLineEdit()
-        self.txt_url.setPlaceholderText("例如: https://note.aisenno.com")
+        self.txt_url.setPlaceholderText("例如: https://gateway.example.com")
         config_layout.addWidget(lbl_url)
         config_layout.addWidget(self.txt_url)
 
@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
         # 托管邮箱
         lbl_email = QLabel("当前 Google 账号邮箱:")
         self.txt_email = QLineEdit()
-        self.txt_email.setPlaceholderText("例如: guyue7737@gmail.com")
+        self.txt_email.setPlaceholderText("例如: your-email@gmail.com")
         config_layout.addWidget(lbl_email)
         config_layout.addWidget(self.txt_email)
 
