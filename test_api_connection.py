@@ -4,8 +4,8 @@ import sys
 import time
 import os
 
-BASE_URL = "http://localhost:18388"
-API_KEY = "nmlg_example_key_12345"
+BASE_URL = "https://note.aisenno.com"
+API_KEY = "my_notebooklm_key_snkj888"
 
 # 定义公共的 HTTP 头部
 headers = {
