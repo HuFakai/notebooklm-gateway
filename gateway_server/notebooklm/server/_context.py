@@ -94,7 +94,8 @@ async def get_client(request: Request) -> NotebookLMClient:
     if api_key in client_pool:
         client = client_pool[api_key]
         # 异步做个文件改写检测与库数据同步
-        _sync_back_if_modified(client._path.parent.name)  # client._path.parent.name 是账号 email
+        if client._auth and client._auth.storage_path:
+            _sync_back_if_modified(client._auth.storage_path.parent.name)
         return client
 
     # 5. 从 SQLite 数据库查找
