@@ -165,10 +165,16 @@ async function sendChatMessage() {
       messagesList.scrollTop = messagesList.scrollHeight;
     },
     // onDone
-    () => {
+    (result) => {
       if (bubble.classList.contains('loading-stream')) {
         bubble.classList.remove('loading-stream');
         bubble.innerHTML = 'AI 对话响应为空。';
+      }
+      if (result && result.conversation_id) {
+        activeConversationId = result.conversation_id;
+      }
+      if (result && result.references && result.references.length > 0) {
+        renderReferences(aiMsg, result.references);
       }
     },
     // onError
@@ -180,6 +186,27 @@ async function sendChatMessage() {
       messagesList.scrollTop = messagesList.scrollHeight;
     }
   );
+}
+
+function renderReferences(messageEl, references) {
+  const refContainer = document.createElement('div');
+  refContainer.className = 'message-references';
+  refContainer.innerHTML = '<div class="ref-label">🔍 引用来源 (点击查看引用原文):</div><div class="ref-list"></div>';
+  
+  const refList = refContainer.querySelector('.ref-list');
+  references.forEach((ref, idx) => {
+    const chip = document.createElement('span');
+    chip.className = 'ref-chip';
+    chip.textContent = `${idx + 1}. ${ref.source_title || '未命名文档'}`;
+    
+    // 点击小卡片，弹窗展示精确引用的原文文本
+    chip.addEventListener('click', () => {
+      alert(`引用自《${ref.source_title}》的原文片段：\n\n${ref.quotes.join('\n\n')}`);
+    });
+    refList.appendChild(chip);
+  });
+  
+  messageEl.appendChild(refContainer);
 }
 
 function escapeHTML(str) {

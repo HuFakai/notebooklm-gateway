@@ -166,14 +166,17 @@ export class APIClient {
       : { chat_mode: chatMode };
     return this.request('POST', `/v1/notebooks/${notebookId}/chat/configure`, payload);
   }
-
   async getSuggestedPrompts(notebookId) {
     const res = await this.request('GET', `/v1/notebooks/${notebookId}/suggested-prompts`);
     return res.suggestions || [];
   }
 
+  async getNotebookDescription(notebookId) {
+    return this.request('GET', `/v1/notebooks/${notebookId}/description`);
+  }
+
   /**
-   * 发起流式对话 (SSE)
+   * 发起对话 (模拟流式输出以兼容原版UI动效)
    */
   async chatStream(notebookId, question, conversationId = null, onChunk, onDone, onError) {
     const url = `${this.baseURL}/v1/notebooks/${notebookId}/chat`;
@@ -199,44 +202,24 @@ export class APIClient {
         throw new Error(errMsg);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop(); // 最后一项可能是未完成的数据行，留在缓存中
-
-        for (const line of lines) {
-          const cleanLine = line.trim();
-          if (!cleanLine) continue;
-
-          if (cleanLine.startsWith('data:')) {
-            const dataStr = cleanLine.substring(5).trim();
-            if (dataStr === '[DONE]') {
-              onDone();
-              return;
-            }
-            try {
-              const dataJson = JSON.parse(dataStr);
-              const chunk = dataJson.text || dataJson.content || '';
-              onChunk(chunk);
-            } catch (e) {
-              console.warn('解析 SSE 行失败:', cleanLine, e);
-            }
-          }
-        }
-      }
+      const resJson = await response.json();
+      const answer = resJson.answer || '';
       
-      // 流结束但可能没有收到 [DONE]
-      onDone();
-
+      // 模拟打字机效果流式输出，使得前端流式渐显动画保持流畅
+      let index = 0;
+      const charsPerTick = 3;
+      const timer = setInterval(() => {
+        if (index >= answer.length) {
+          clearInterval(timer);
+          onDone(resJson);
+          return;
+        }
+        const chunk = answer.substring(index, index + charsPerTick);
+        index += charsPerTick;
+        onChunk(chunk);
+      }, 10);
     } catch (error) {
-      console.error('SSE 对话请求失败:', error);
+      console.error('对话请求失败:', error);
       onError(error);
     }
   }

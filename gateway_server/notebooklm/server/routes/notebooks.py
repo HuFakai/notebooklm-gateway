@@ -115,6 +115,19 @@ async def suggested_prompts(
     }
 
 
+@router.get("/{notebook_id}/description")
+async def get_notebook_description(
+    notebook_id: str,
+    client: ClientDep,
+) -> dict[str, Any]:
+    """Fetch AI-generated description (summary and topics) for the notebook.
+
+    Mirrors client.notebooks.get_description.
+    """
+    description = await client.notebooks.get_description(notebook_id)
+    return to_jsonable(description)
+
+
 @router.delete("/{notebook_id}", status_code=204)
 async def delete_notebook(notebook_id: str, client: ClientDep) -> Response:
     """Delete a notebook (idempotent-on-missing — never 500 for an absent id)."""

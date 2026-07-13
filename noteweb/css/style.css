@@ -1930,3 +1930,42 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--neon-blue);
   color: var(--neon-blue);
 }
+
+/* 22. AI 智能对话引用卡片样式 */
+.message-references {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+}
+
+.ref-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.ref-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ref-chip {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  color: var(--neon-blue);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.ref-chip:hover {
+  background-color: var(--neon-blue-glow);
+  border-color: var(--neon-blue);
+}
