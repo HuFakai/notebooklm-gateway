@@ -19,9 +19,16 @@ def build_app():
         print("pip install PyInstaller PySide6 httpx playwright")
         sys.exit(1)
 
+    # 动态定位当前虚拟环境下的 pyinstaller 可执行文件路径
+    python_dir = Path(sys.executable).parent
+    pyinstaller_bin = "pyinstaller.exe" if sys.platform == "win32" else "pyinstaller"
+    pyinstaller_path = python_dir / pyinstaller_bin
+    if not pyinstaller_path.exists():
+        pyinstaller_path = Path(pyinstaller_bin)
+
     # 构造 PyInstaller 命令行
     cmd = [
-        "pyinstaller",
+        str(pyinstaller_path),
         "--clean",
         "-y",
         "-F",                    # 单文件打包
@@ -31,6 +38,9 @@ def build_app():
         f"--add-data=gateway_server{os.pathsep}gateway_server",
         # 收集 Playwright 相关的运行时文件
         "--collect-all=playwright",
+        # 拷贝 gpsoauth 和 notebooklm-py 的元数据，防止 importlib.metadata 报错
+        "--copy-metadata=gpsoauth",
+        "--copy-metadata=notebooklm-py",
         "gateway_client/app.py"
     ]
     
