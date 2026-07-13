@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NotebookLM Web 极简智能笔记控制台</title>
+  <!-- 引入现代字体 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- 引入本项目的 CSS -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 背景氖光模糊光斑，增强视觉品质 -->
+  <div class="glow-bg">
+    <div class="blob blob-blue"></div>
+    <div class="blob blob-purple"></div>
+    <div class="blob blob-green"></div>
+  </div>
+
+  <div class="app-layout">
+    <!-- 1. 左侧边栏 (控制面板 & 笔记本列表 & 文档来源) -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-box">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.168.477 4.253 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <span class="logo-text">NotebookLM<span class="logo-sub">Web</span></span>
+        </div>
+        <button id="btn-settings" class="icon-btn" title="配置 API 设置">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- 当前账户简要状态 -->
+      <div id="account-badge" class="account-badge unconfigured">
+        <div class="badge-dot"></div>
+        <span id="badge-email">未配置 API 密钥</span>
+      </div>
+
+      <!-- 笔记本管理区 -->
+      <div class="sidebar-section">
+        <div class="section-title">
+          <span>我的笔记本</span>
+          <button id="btn-new-notebook" class="section-action-btn" title="新建笔记本">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+        <div id="notebooks-list" class="sidebar-list">
+          <!-- 动态加载 -->
+          <div class="empty-state">暂无笔记本</div>
+        </div>
+      </div>
+
+      <!-- 文档来源管理区 -->
+      <div id="sources-section" class="sidebar-section disabled">
+        <div class="section-title">
+          <span>参考文档来源</span>
+          <button id="btn-add-source" class="section-action-btn" title="添加来源" disabled>
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+        <div id="sources-list" class="sidebar-list">
+          <!-- 动态加载 -->
+          <div class="empty-state">选择笔记本后加载来源</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 2. 右侧主工作区 -->
+    <main class="main-content">
+      <!-- 未选择笔记本的初始空白状态 -->
+      <div id="main-empty-view" class="main-empty-view">
+        <div class="empty-hero">
+          <svg class="hero-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.168.477 4.253 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <h2>欢迎使用 NotebookLM Web</h2>
+          <p>请在左侧配置 API 密钥并选择或新建一个笔记本开始探索，您将拥有强大的 AI 文档提炼、对话与多媒体 Studio 生成能力。</p>
+          <button id="btn-empty-start" class="btn btn-primary">立即配置 API 密钥</button>
+        </div>
+      </div>
+
+      <!-- 笔记本激活后的视图 -->
+      <div id="main-workspace-view" class="main-workspace-view hidden">
+        <!-- 笔记本标题栏 -->
+        <header class="workspace-header">
+          <div class="notebook-title-area">
+            <h1 id="active-notebook-title" class="notebook-title" title="双击重命名">加载中...</h1>
+            <input type="text" id="input-notebook-rename" class="notebook-rename-input hidden">
+            <button id="btn-save-rename" class="icon-btn success hidden" title="保存重命名">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </button>
+            <button id="btn-delete-notebook" class="icon-btn danger" title="删除当前笔记本">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Tab 标签页切换 -->
+          <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="notes">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>笔记卡片</span>
+            </button>
+            <button class="tab-btn" data-tab="chat">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>智能对话</span>
+            </button>
+            <button class="tab-btn" data-tab="research">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span>深度探索</span>
+            </button>
+            <button class="tab-btn" data-tab="studio">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Studio 生成物</span>
+            </button>
+            <button class="tab-btn" data-tab="share">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              <span>共享管理</span>
+            </button>
+          </nav>
+        </header>
+
+        <!-- Tab 内容区域包装 -->
+        <div class="workspace-body">
+          <!-- 2.1 笔记 Tab -->
+          <div id="tab-content-notes" class="tab-pane active">
+            <div class="notes-grid-header">
+              <h3>快速随笔</h3>
+              <p class="subtitle">记录您的思绪与灵感，可随时从左侧的参考来源获取 AI 帮助</p>
+            </div>
+            <div id="notes-grid" class="notes-grid">
+              <!-- Bento-grid 风格卡片动态插入 -->
+              <div id="btn-add-note-card" class="note-card add-card">
+                <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>写新笔记</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2.2 智能对话 Tab -->
+          <div id="tab-content-chat" class="tab-pane">
+            <div class="chat-container">
+              <!-- 引导提示词区域 -->
+              <div id="chat-suggestions" class="chat-suggestions hidden">
+                <div class="suggestions-label">💡 试试这样问：</div>
+                <div id="suggestions-chips" class="suggestions-chips">
+                  <!-- 动态芯片 -->
+                </div>
+              </div>
+
+              <!-- 消息列表面板 -->
+              <div id="chat-messages" class="chat-messages">
+                <div class="chat-welcome">
+                  <div class="welcome-avatar">💬</div>
+                  <h3>智能对话助手</h3>
+                  <p>我已经深入阅读了您左侧载入的所有文档，您可以向我提问任何相关的问题。</p>
+                  <div class="chat-tips">提示：点击右侧的设置齿轮，可以配置专属于本笔记本的 AI 目标 (Goal) 或者是对话预设模式！</div>
+                </div>
+              </div>
+
+              <!-- 输入控制区域 -->
+              <div class="chat-input-area">
+                <button id="btn-chat-configure" class="icon-btn" title="配置对话设定">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
+                <div class="input-wrapper">
+                  <textarea id="chat-input" placeholder="输入问题开始分析，回车发送，Shift + 回车换行..." rows="1"></textarea>
+                </div>
+                <button id="btn-chat-send" class="btn btn-primary" title="发送提问">
+                  <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2.3 深度探索 Tab -->
+          <div id="tab-content-research" class="tab-pane">
+            <div class="research-layout">
+              <!-- 研究表单参数配置 -->
+              <div class="research-config-card glass-card">
+                <h3>启动深度探索</h3>
+                <p class="subtitle">调用全球搜索引擎或网盘数据，为你输出深度综述长报告，并可一键导入作为参考文档。</p>
+
+                <div class="form-group">
+                  <label for="research-query">研究课题 / 搜索关键词</label>
+                  <input type="text" id="research-query" placeholder="例如：2026年拓扑超导量子比特最新突破">
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="research-source">数据来源</label>
+                    <select id="research-source">
+                      <option value="web">互联网 (Web Search)</option>
+                      <option value="drive">云端网盘 (Google Drive)</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="research-mode">研究深度</label>
+                    <select id="research-mode">
+                      <option value="fast">快速探索 (Fast)</option>
+                      <option value="deep">学术研究 (Deep Research)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button id="btn-start-research" class="btn btn-primary btn-block">
+                  <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <span>立即启动研究会话</span>
+                </button>
+              </div>
+
+              <!-- 研究状态与结果面板 -->
+              <div class="research-result-card glass-card">
+                <div class="result-header">
+                  <h3>研究成果与报告</h3>
+                  <button id="btn-import-research" class="btn btn-green hidden" title="将此报告及参考文献导入到本笔记本作为 Source">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                      <polyline points="17 21 17 13 7 13 7 21"/>
+                      <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    <span>导入参考源</span>
+                  </button>
+                </div>
+
+                <div id="research-status-panel" class="research-status-panel hidden">
+                  <div class="spinner-wave">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
+                  <p id="research-status-text">正在初始化研究管道...</p>
+                  <button id="btn-cancel-research" class="btn btn-danger btn-sm">取消研究</button>
+                </div>
+
+                <div id="research-report-view" class="research-report-view">
+                  <div class="empty-state">输入研究课题，开始搜集世界范围内的知识成果</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2.4 Studio 智能生成物 Tab -->
+          <div id="tab-content-studio" class="tab-pane">
+            <div class="studio-layout">
+              <!-- 左侧：新建生成器 -->
+              <div class="studio-selector-card glass-card">
+                <h3>新建智能生成物</h3>
+                <p class="subtitle">基于笔记本中的现有所有文档来源，一键生成不同媒介的总结或交互应用。</p>
+                
+                <div class="artifact-types-grid">
+                  <div class="artifact-type-btn active" data-type="audio">
+                    <div class="type-avatar">🎙️</div>
+                    <div class="type-name">音频播客 (Podcast)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="report">
+                    <div class="type-avatar">📄</div>
+                    <div class="type-name">研究简报 (Report)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="quiz">
+                    <div class="type-avatar">📝</div>
+                    <div class="type-name">测验试卷 (Quiz)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="flashcards">
+                    <div class="type-avatar">🎴</div>
+                    <div class="type-name">互动闪卡 (Flashcards)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="mind-map">
+                    <div class="type-avatar">🧠</div>
+                    <div class="type-name">思维导图 (Mindmap)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="slide-deck">
+                    <div class="type-avatar">📊</div>
+                    <div class="type-name">幻灯片 (Slides)</div>
+                  </div>
+                </div>
+
+                <!-- 动态生成物参数配置表单 -->
+                <div id="artifact-options-form" class="artifact-options-form">
+                  <!-- 由 JS 根据选中的 type 动态渲染相应表单 -->
+                </div>
+
+                <div class="form-group">
+                  <label for="artifact-instructions">自定义生成指令 (可选)</label>
+                  <textarea id="artifact-instructions" placeholder="输入个性化的生成提示词（例如：播客要求用诙谐的中文对话，或者测试卷只出量子力学基础单选题）" rows="3"></textarea>
+                </div>
+
+                <button id="btn-generate-artifact" class="btn btn-purple btn-block">
+                  <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 2 22 12 17 22 22 12 2"></polygon>
+                  </svg>
+                  <span>立即发起异步构建任务</span>
+                </button>
+              </div>
+
+              <!-- 右侧：生成物列表与状态轮询 -->
+              <div class="studio-list-card glass-card">
+                <h3>生成工作室历史</h3>
+                <div id="artifacts-list" class="artifacts-list">
+                  <!-- 动态加载 -->
+                  <div class="empty-state">尚未创建任何智能生成物</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2.5 共享管理 Tab -->
+          <div id="tab-content-share" class="tab-pane">
+            <div class="share-layout">
+              <!-- 公开访问卡片 -->
+              <div class="share-card glass-card">
+                <div class="card-header">
+                  <h3>公开链接分享</h3>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="share-public-toggle">
+                    <label for="share-public-toggle"></label>
+                  </div>
+                </div>
+                <p class="subtitle">启用后，任何拥有此链接的人都可以查看本笔记本的脱水内容及相关来源。</p>
+                <div id="public-link-container" class="public-link-container hidden">
+                  <input type="text" id="public-share-link" readonly value="">
+                  <button id="btn-copy-share-link" class="btn btn-primary">复制链接</button>
+                </div>
+              </div>
+
+              <!-- 协作者管理卡片 -->
+              <div class="share-card glass-card">
+                <h3>协作者与成员管理</h3>
+                <p class="subtitle">邀请协作者，共同补充文档来源、书写笔记或发起智能生成任务。</p>
+                
+                <div class="add-user-row">
+                  <div class="form-group flex-1">
+                    <input type="email" id="share-user-email" placeholder="协作者的 Gmail 邮箱...">
+                  </div>
+                  <div class="form-group">
+                    <select id="share-user-permission">
+                      <option value="viewer">查看者 (Viewer)</option>
+                      <option value="editor">编辑者 (Editor)</option>
+                    </select>
+                  </div>
+                  <button id="btn-add-collaborator" class="btn btn-primary">添加成员</button>
+                </div>
+
+                <div class="collaborators-table-wrapper">
+                  <table class="collaborators-table">
+                    <thead>
+                      <tr>
+                        <th>成员邮箱</th>
+                        <th>权限角色</th>
+                        <th style="width: 100px; text-align: center;">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="collaborators-list">
+                      <!-- 动态填充 -->
+                      <tr>
+                        <td colspan="3" class="table-empty">暂无受邀协作者</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 3. 全局模态弹窗组合 -->
+
+  <!-- 3.1 API 配置设置弹窗 -->
+  <div id="modal-settings" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>NotebookLM Gateway 配置中心</h3>
+        <button class="modal-close icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-description">配置您的本地网关 API 端点与 User API Key，这些设置保存在浏览器本地，不会上传第三方服务器。</p>
+        
+        <div class="form-group">
+          <label for="settings-url">网关服务器地址 (Base URL)</label>
+          <input type="text" id="settings-url" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
+        </div>
+
+        <div class="form-group">
+          <label for="settings-key">用户 API 调用密钥 (User API Key)</label>
+          <input type="password" id="settings-key" placeholder="输入形如 nmlg_xxx 的 API Key...">
+        </div>
+
+        <div class="connection-status-panel">
+          <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="settings-status-text">未验证</span>
+          </div>
+          <button id="btn-test-connection" class="btn btn-sm">测试连接</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn btn-primary btn-block" disabled>保存并开启控制台</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.2 笔记卡片详细编辑弹窗 -->
+  <div id="modal-note-edit" class="modal-overlay">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <input type="text" id="note-edit-title" class="note-edit-title-input" placeholder="输入笔记标题...">
+        <button class="modal-close icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="note-edit-content" class="note-edit-textarea" placeholder="在此输入您的灵感或思考...（支持 Markdown）"></textarea>
+      </div>
+      <div class="modal-footer">
+        <span id="note-save-time" class="note-save-time">未保存</span>
+        <div class="modal-actions-right">
+          <button id="btn-delete-active-note" class="btn btn-danger">删除笔记</button>
+          <button id="btn-save-note" class="btn btn-green">保存笔记</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.3 添加参考来源弹窗 -->
+  <div id="modal-add-source" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>添加参考文档来源</h3>
+        <button class="modal-close icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="source-tab-nav">
+          <button class="stab-btn active" data-stab="stype-text">纯文本</button>
+          <button class="stab-btn" data-stab="stype-url">网页/链接</button>
+          <button class="stab-btn" data-stab="stype-file">本地物理文件</button>
+          <button class="stab-btn" data-stab="stype-drive">Google Drive</button>
+        </div>
+
+        <!-- 3.3.1 纯文本录入 -->
+        <div id="stab-content-stype-text" class="source-tab-content active">
+          <div class="form-group">
+            <label for="source-text-title">文档标题</label>
+            <input type="text" id="source-text-title" placeholder="例如：深空探测技术简史">
+          </div>
+          <div class="form-group">
+            <label for="source-text-body">参考内容文本</label>
+            <textarea id="source-text-body" placeholder="粘贴您的文档正文内容..." rows="8"></textarea>
+          </div>
+        </div>
+
+        <!-- 3.3.2 网页录入 -->
+        <div id="stab-content-stype-url" class="source-tab-content">
+          <div class="form-group">
+            <label for="source-url-input">网页 URL 网址</label>
+            <input type="url" id="source-url-input" placeholder="https://example.com/some-article">
+          </div>
+          <div class="form-group">
+            <label for="source-urls-batch">或者批量抓取网页（每行输入一个 URL）</label>
+            <textarea id="source-urls-batch" placeholder="https://example.com/page1&#10;https://example.com/page2" rows="5"></textarea>
+          </div>
+          <div class="form-checkbox">
+            <input type="checkbox" id="url-allow-internal">
+            <label for="url-allow-internal">允许抓取内部域名/限制内容</label>
+          </div>
+        </div>
+
+        <!-- 3.3.3 物理本地文件上传 -->
+        <div id="stab-content-stype-file" class="source-tab-content">
+          <div id="source-file-dropzone" class="file-dropzone">
+            <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p class="drop-text">将 PDF, TXT 等文件拖拽至此，或 <span>点击选择本地文件</span></p>
+            <p class="drop-limit">单个文件不能超过 20MB</p>
+            <input type="file" id="source-file-input" class="hidden" accept=".pdf,.txt,.docx,.md,.json">
+          </div>
+          <div id="source-file-selected" class="file-selected-status hidden">
+            <span class="file-name">已选择：xxxx.pdf</span>
+            <button id="btn-clear-file" class="icon-btn danger">&times;</button>
+          </div>
+        </div>
+
+        <!-- 3.3.4 Drive 云端文档 -->
+        <div id="stab-content-stype-drive" class="source-tab-content">
+          <div class="form-group">
+            <label for="source-drive-docid">Google Drive 资源标识符 (Document ID)</label>
+            <input type="text" id="source-drive-docid" placeholder="输入从网页版提取的 ID，如：1A2B3C4D...">
+          </div>
+          <div class="form-group">
+            <label for="source-drive-mimetype">资源 MIME 类型</label>
+            <select id="source-drive-mimetype">
+              <option value="google-doc">Google Docs 文档</option>
+              <option value="google-sheet">Google Sheets 表格</option>
+              <option value="pdf">PDF 格式文件</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="source-drive-title">文档标题 (可选)</label>
+            <input type="text" id="source-drive-title" placeholder="留空则读取文件默认属性名称">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-submit-source" class="btn btn-primary btn-block">确认添加该参考来源</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.4 来源纯文本脱水内容查看器弹窗 (Slide-over 滑入层) -->
+  <div id="slideover-source-viewer" class="slideover-overlay">
+    <div class="slideover-card">
+      <div class="slideover-header">
+        <h3 id="source-viewer-title">文档正文查看</h3>
+        <button class="slideover-close icon-btn">&times;</button>
+      </div>
+      <div class="slideover-body">
+        <!-- 展示去噪处理后的 Markdown 文档内容 -->
+        <div id="source-viewer-content" class="source-viewer-content">
+          <!-- 动态加载 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.5 智能对话行为配置弹窗 -->
+  <div id="modal-chat-config" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>智能对话设定</h3>
+        <button class="modal-close icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-description">自定义 AI 的人设、目标以及回答字数偏好，以便生成符合特定专业语境的回答。</p>
+        
+        <div class="form-group">
+          <label for="chat-config-mode">选择经典预设模式 (Preset)</label>
+          <select id="chat-config-mode">
+            <option value="default">默认通用助手</option>
+            <option value="learning-guide">学习向导 (提问式引导)</option>
+            <option value="concise">极简风 (核心要点)</option>
+            <option value="detailed">深度科研 (逻辑详尽)</option>
+            <option value="custom">-- 自定义 Persona / Goal --</option>
+          </select>
+        </div>
+
+        <div id="chat-custom-goal-group" class="form-group hidden">
+          <label for="chat-config-goal">自定义系统指令 (Goal)</label>
+          <textarea id="chat-config-goal" placeholder="例如：你是一个深空探索领航员，请用科幻且专业的冷酷口吻来解答..." rows="3"></textarea>
+        </div>
+
+        <div id="chat-custom-len-group" class="form-group hidden">
+          <label for="chat-config-length">回答字数长度</label>
+          <select id="chat-config-length">
+            <option value="default">默认长度</option>
+            <option value="short">短回答</option>
+            <option value="long">长篇综述</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-chat-config" class="btn btn-primary btn-block">应用对话配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.6 智能生成物详情展示与交互弹窗 -->
+  <div id="modal-artifact-view" class="modal-overlay">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <h3 id="artifact-view-title">生成物详情</h3>
+        <button class="modal-close icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- 3.6.1 报告类生成物 Markdown 展示 -->
+        <div id="artifact-report-container" class="artifact-subview hidden">
+          <div id="artifact-report-text" class="artifact-report-text"></div>
+        </div>
+
+        <!-- 3.6.2 播客音频类播放器展示 -->
+        <div id="artifact-audio-container" class="artifact-subview hidden">
+          <div class="audio-player-card">
+            <div class="audio-disc-wrapper">
+              <div class="disc-glow"></div>
+              <div class="audio-disc">🎙️</div>
+            </div>
+            <h4>音频播客生成完毕</h4>
+            <p>基于您的文档来源，AI 双人组已经为您制作了一份生动的对话式博客节目。</p>
+            <audio id="artifact-audio-player" controls class="custom-audio"></audio>
+          </div>
+        </div>
+
+        <!-- 3.6.3 测验类与互动闪卡展示 -->
+        <div id="artifact-quiz-container" class="artifact-subview hidden">
+          <div id="artifact-quiz-content" class="artifact-quiz-content">
+            <!-- 动态生成测验问答 -->
+          </div>
+        </div>
+
+        <!-- 3.6.4 其他类型（如脑图）的 JSON 展示 -->
+        <div id="artifact-default-container" class="artifact-subview hidden">
+          <pre id="artifact-raw-json" class="json-code"></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-download-artifact" class="btn btn-purple">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>下载文件</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.7 全局 Toast 提示容器 -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- 引入模块化 JS 入口 -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

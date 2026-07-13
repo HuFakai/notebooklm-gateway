@@ -22,6 +22,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_pna_header(request: Request, call_next):
+    response = await call_next(request)
+    if "Access-Control-Request-Private-Network" in request.headers:
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
 db = DatabaseManager()
 
 # 获取全局 Admin Token 用于上传和管理页面鉴权
@@ -213,4 +220,13 @@ async def admin_page():
         )
     with open(template_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+
+# =====================================================================
+# 核心路由 4：挂载前端笔记控制台静态目录 (NoteWeb)
+# =====================================================================
+noteweb_path = Path(__file__).parent.parent / "noteweb"
+if noteweb_path.exists():
+    app.mount("/noteweb", StaticFiles(directory=str(noteweb_path), html=True), name="noteweb")
+
 
