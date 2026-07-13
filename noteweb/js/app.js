@@ -11,18 +11,20 @@ import { initChat, renderChatTab } from './components/chat.js';
 import { initResearch, renderResearchTab } from './components/research.js';
 import { initArtifacts, renderArtifactsTab } from './components/artifacts.js';
 import { initShare, renderShareTab } from './components/share.js';
+import { initGuide, renderGuideTab } from './components/guide.js';
 
 // 1. 初始化全局状态与客户端
 window.state = {
   currentNotebookId: null,
   currentNotebookTitle: '',
-  activeTab: 'notes',
+  activeTab: 'guide',
   notebooks: [],
   sources: [],
   notes: [],
   artifacts: [],
   collaborators: [],
-  publicAccess: 'disabled'
+  publicAccess: 'disabled',
+  summaryCache: {}
 };
 
 window.apiClient = new APIClient();
@@ -123,7 +125,8 @@ window.switchTab = function(tabName) {
 
   // 根据当前激活 Tab 渲染相应的数据
   if (window.state.currentNotebookId) {
-    if (tabName === 'notes') renderNotesGrid();
+    if (tabName === 'guide') renderGuideTab();
+    else if (tabName === 'notes') renderNotesGrid();
     else if (tabName === 'chat') renderChatTab();
     else if (tabName === 'research') renderResearchTab();
     else if (tabName === 'studio') renderArtifactsTab();
@@ -169,7 +172,7 @@ window.loadActiveNotebook = async function(notebookId, forceRefreshTab = true) {
     });
 
     // 异步加载此笔记本下的参考来源文档列表
-    await initSources(notebookId);
+    await initSources(notebookId, false);
 
     // 默认展示或更新当前 Tab 面板
     if (forceRefreshTab) {
@@ -310,6 +313,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // 初始化笔记本子模块交互
+  initGuide();
   initNotebooks();
   initNotes();
   initChat();

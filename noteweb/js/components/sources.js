@@ -5,11 +5,17 @@
 
 let selectedFile = null;
 
-export async function initSources(notebookId) {
+export async function initSources(notebookId, refreshActiveTab = true) {
   try {
     const sources = await window.apiClient.listSources(notebookId);
     window.state.sources = sources;
     renderSourcesList();
+    
+    // 如果当前处于 Guide 标签页下，也刷新 Guide 内的文档源及建议等
+    if (refreshActiveTab && window.state.activeTab === 'guide') {
+      const { renderGuideTab } = await import('./guide.js');
+      renderGuideTab();
+    }
   } catch (err) {
     console.error('加载参考源失败:', err);
     window.showToast('加载参考源失败', 'error');
@@ -87,6 +93,9 @@ export function renderSourcesList() {
       if (!confirmed) return;
 
       try {
+        if (window.state.summaryCache) {
+          delete window.state.summaryCache[window.state.currentNotebookId];
+        }
         await window.apiClient.deleteSource(window.state.currentNotebookId, srcId);
         window.showToast('参考源已成功删除');
         await initSources(window.state.currentNotebookId);
@@ -125,7 +134,10 @@ async function waitAndRefreshSources(notebookId, sourceIds) {
   } catch (err) {
     window.showToast(`文档就绪等待超时或发生错误: ${err.message}`, 'error');
   }
-  // 无论是成功还是超时，刷新列表显示最新状态
+  // 无论是成功还是超时，刷新列表并清空已有的摘要缓存以强制重新生成
+  if (window.state.summaryCache) {
+    delete window.state.summaryCache[notebookId];
+  }
   await initSources(notebookId);
 }
 
