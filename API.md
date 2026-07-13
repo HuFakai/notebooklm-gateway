@@ -200,6 +200,20 @@
 *   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}`
 *   **返回状态**：`204 No Content`
 
+#### 2.2.6 获取笔记本 AI 摘要描述与建议问题
+*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/description`
+*   **用途**：获取笔记本内预加载 of AI 综合描述 (Summary) 和 Suggested Topics 引导词。
+*   **返回示例**：
+    ```json
+    {
+      "summary": "这是关于此笔记本内所有参考源的综合内容摘要...",
+      "suggested_topics": [
+        "量子纠缠在超导电路中的最新进展是什么？",
+        "本文提及的量子退相干时间大概是多少？"
+      ]
+    }
+    ```
+
 ---
 
 ### 2.3 文档来源管理 (Sources)
@@ -670,16 +684,36 @@
     }
     ```
 
-#### 2.7.7 下载生成的二进制媒体文件 (如音频或幻灯片 PDF)
+#### 2.7.7 下载及导出已生成的智能生成物文件
 *   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts/download`
-*   **请求 Body (JSON)**：
-    *   `type`: 下载类型，例如 `audio`、`slide-deck` 等
+*   **请求 Body 参数 (JSON)**：
+    *   `type` (必填): 下载类型，支持如下：
+        *   `audio`: 音频播客 (导出格式: `.mp3`)
+        *   `video`: 视频 (导出格式: `.mp4`)
+        *   `slide-deck`: 幻灯片 (默认格式: `.pdf`，可选配置 `output_format`)
+        *   `infographic`: 信息图 (导出格式: `.png`)
+        *   `report`: 研究简报 (导出格式: `.md`)
+        *   `mind-map`: 思维导图 (导出格式: `.json`)
+        *   `data-table`: 数据表格 (导出格式: `.csv`)
+        *   `quiz`: 思考测验 (默认格式: `.json`，可选配置 `output_format`)
+        *   `flashcards`: 互动闪卡 (默认格式: `.json`，可选配置 `output_format`)
+    *   `output_format` (可选): 指定导出文件格式扩展名：
+        *   `slide-deck` 允许: `pdf` / `pptx`
+        *   `quiz` & `flashcards` 允许: `json` / `markdown` / `html`
+    *   *示例 1 (下载默认播客 MP3)*：
     ```json
     {
       "type": "audio"
     }
     ```
-*   **返回流**：二进制字节流 (以 `FileResponse` 返回物理文件，并自动在下载完成后清理网关服务器上的临时缓存)。
+    *   *示例 2 (将试卷测验导出为 Markdown 格式下载)*：
+    ```json
+    {
+      "type": "quiz",
+      "output_format": "markdown"
+    }
+    ```
+*   **返回流**：对应格式的二进制字节流 (以 `FileResponse` 形式返回物理文件，网关会在传输完成后安全自动清理服务器生成的临时缓存文件)。
 
 #### 2.7.8 彻底删除生成物
 *   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/artifacts/{artifact_id}`
