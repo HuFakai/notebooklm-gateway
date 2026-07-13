@@ -655,6 +655,8 @@ async function downloadFile(notebookId, type, filename) {
     // 根据类型判定扩展名
     let ext = '.txt';
     if (type === 'audio') ext = '.mp3';
+    else if (type === 'video') ext = '.mp4';
+    else if (type === 'infographic') ext = '.png';
     else if (type === 'slide-deck') ext = '.pdf';
     else if (type === 'quiz' || type === 'mind-map' || type === 'flashcards') ext = '.json';
     else if (type === 'report') ext = '.md';
