@@ -272,7 +272,45 @@ export class APIClient {
   // ==========================================
   async listArtifacts(notebookId) {
     const res = await this.request('GET', `/v1/notebooks/${notebookId}/artifacts`);
-    return res.artifacts || [];
+    const rawList = res.artifacts || [];
+    
+    // 归一化处理，将后端的整型 status 和 _artifact_type 转换为前端可读的字符串，并补充 type 字段
+    return rawList.map(art => {
+      // 1. 状态转换
+      let statusStr = 'completed';
+      if (art.status === 1) statusStr = 'in_progress';
+      else if (art.status === 2) statusStr = 'pending';
+      else if (art.status === 3) statusStr = 'completed';
+      else if (art.status === 4) statusStr = 'failed';
+      
+      // 2. 类型转换
+      let typeStr = 'report';
+      const typeCode = art._artifact_type;
+      const variant = art._variant;
+      
+      if (typeCode === 1) typeStr = 'audio';
+      else if (typeCode === 2) typeStr = 'report';
+      else if (typeCode === 3) typeStr = 'video';
+      else if (typeCode === 4) {
+        if (variant === 1 || (art.title && art.title.includes('闪卡'))) {
+          typeStr = 'flashcards';
+        } else if (variant === 4) {
+          typeStr = 'mind-map';
+        } else {
+          typeStr = 'quiz';
+        }
+      }
+      else if (typeCode === 5) typeStr = 'mind-map';
+      else if (typeCode === 7) typeStr = 'infographic';
+      else if (typeCode === 8) typeStr = 'slide-deck';
+      else if (typeCode === 9) typeStr = 'data-table';
+      
+      return {
+        ...art,
+        type: typeStr,
+        status: statusStr
+      };
+    });
   }
 
   async createArtifact(notebookId, payload) {
@@ -280,7 +318,22 @@ export class APIClient {
   }
 
   async getArtifactStatus(notebookId, taskId) {
-    return this.request('GET', `/v1/notebooks/${notebookId}/artifacts/${taskId}`);
+    const res = await this.request('GET', `/v1/notebooks/${notebookId}/artifacts/${taskId}`);
+    
+    // 兼容可能为整型的 status
+    let statusStr = res.status;
+    if (statusStr === 1) statusStr = 'in_progress';
+    else if (statusStr === 2) statusStr = 'pending';
+    else if (statusStr === 3) statusStr = 'completed';
+    else if (statusStr === 4) statusStr = 'failed';
+    
+    if (typeof statusStr === 'string') {
+      statusStr = statusStr.toLowerCase();
+    }
+    return {
+      ...res,
+      status: statusStr
+    };
   }
 
   async getArtifactPrompt(notebookId, artifactId) {

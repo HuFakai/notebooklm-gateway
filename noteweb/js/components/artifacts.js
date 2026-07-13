@@ -145,16 +145,34 @@ export async function renderArtifactsTab() {
 
   const listContainer = document.getElementById('artifacts-list');
 
+  // 初始化并从 LocalStorage 加载当前笔记本的 pending 任务列表
+  if (!window.state.pendingTasks) {
+    try {
+      window.state.pendingTasks = JSON.parse(localStorage.getItem(`pending_tasks_${notebookId}`)) || [];
+    } catch (_) {
+      window.state.pendingTasks = [];
+    }
+  }
+
   try {
     const list = await window.apiClient.listArtifacts(notebookId);
     window.state.artifacts = list;
 
-    if (list.length === 0) {
+    // 清理：如果某个 pending 任务已经在已完成的服务器列表中，就从 pendingTasks 中移除
+    window.state.pendingTasks = window.state.pendingTasks.filter(pt => {
+      return !list.some(art => art.id === pt.id);
+    });
+    localStorage.setItem(`pending_tasks_${notebookId}`, JSON.stringify(window.state.pendingTasks));
+
+    // 合并 pending 任务与服务器返回 of 已完成任务
+    const mergedList = [...window.state.pendingTasks, ...list];
+
+    if (mergedList.length === 0) {
       listContainer.innerHTML = '<div class="empty-state">尚未创建任何智能生成物</div>';
       return;
     }
 
-    listContainer.innerHTML = list.map(art => {
+    listContainer.innerHTML = mergedList.map(art => {
       // 区分类型表情符号
       let emoji = '📦';
       if (art.type === 'audio') emoji = '🎙️';
@@ -168,10 +186,20 @@ export async function renderArtifactsTab() {
       const status = art.status ? art.status.toLowerCase() : 'completed';
       let badgeClass = `badge-${status}`;
       let stateLabel = status;
-      if (status === 'completed') stateLabel = '已完成';
-      else if (status === 'pending') stateLabel = '等待中';
-      else if (status === 'in_progress') stateLabel = '生成中';
-      else if (status === 'failed') stateLabel = '失败';
+      let spinnerHtml = '';
+      
+      if (status === 'completed') {
+        stateLabel = '已完成';
+      } else if (status === 'pending') {
+        stateLabel = '等待中';
+        spinnerHtml = `<div class="spinner-wave spinner-sm" style="display:inline-flex; margin-right:0.4rem;"><span></span><span></span><span></span></div>`;
+      } else if (status === 'in_progress' || status === 'processing') {
+        stateLabel = '生成中';
+        badgeClass = 'badge-in_progress';
+        spinnerHtml = `<div class="spinner-wave spinner-sm" style="display:inline-flex; margin-right:0.4rem;"><span></span><span></span><span></span></div>`;
+      } else if (status === 'failed') {
+        stateLabel = '失败';
+      }
 
       // 构建动作栏
       let actionsHtml = '';
@@ -179,10 +207,13 @@ export async function renderArtifactsTab() {
         actionsHtml = `<button class="btn btn-sm btn-primary view-art-btn" data-id="${art.id}" data-type="${art.type}">查看/播放</button>`;
       } else if (status === 'failed') {
         actionsHtml = `<button class="btn btn-sm btn-purple retry-art-btn" data-id="${art.id}">重试</button>`;
+      } else {
+        // 等待或生成中展示排队文本
+        actionsHtml = `<span style="font-size:0.75rem; color:var(--text-muted);">正在排队构建...</span>`;
       }
 
       return `
-        <div class="artifact-item">
+        <div class="artifact-item ${status === 'in_progress' || status === 'pending' ? 'task-running' : ''}">
           <div class="artifact-item-info">
             <div class="artifact-avatar">${emoji}</div>
             <div class="artifact-title-box">
@@ -191,9 +222,10 @@ export async function renderArtifactsTab() {
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:0.6rem;">
+            ${spinnerHtml}
             <span class="artifact-badge-status ${badgeClass}">${stateLabel}</span>
             ${actionsHtml}
-            <button class="section-action-btn delete-art-btn" data-id="${art.id}" title="删除生成物">
+            <button class="section-action-btn delete-art-btn" data-id="${art.id}" title="删除生成物" ${status === 'in_progress' || status === 'pending' ? 'disabled' : ''}>
               <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -245,10 +277,10 @@ export async function renderArtifactsTab() {
       });
     });
 
-    // 检测是否有正在生成中的任务，自动拉起背景轮询
-    list.forEach(art => {
+    // 检测并拉起正在生成中的任务轮询
+    mergedList.forEach(art => {
       const status = art.status ? art.status.toLowerCase() : 'completed';
-      if ((status === 'pending' || status === 'in_progress') && !activePolls[art.id]) {
+      if ((status === 'pending' || status === 'in_progress' || status === 'processing') && !activePolls[art.id]) {
         startPollingArtifact(notebookId, art.id);
       }
     });
@@ -298,11 +330,34 @@ async function generateArtifactSubmit() {
     // 清空指令输入框
     document.getElementById('artifact-instructions').value = '';
 
-    // 重新刷新列表，并拉起轮询
-    await renderArtifactsTab();
+    // 写入本地 pending 任务并持久化
     if (res.task_id) {
+      if (!window.state.pendingTasks) window.state.pendingTasks = [];
+      
+      const typeNames = {
+        audio: '音频播客 (Podcast)',
+        report: '研究简报 (Report)',
+        quiz: '智能测验 (Quiz)',
+        flashcards: '互动闪卡 (Flashcards)',
+        'mind-map': '思维导图 (Mindmap)',
+        'slide-deck': '幻灯片 (Slides)'
+      };
+      const typeName = typeNames[payload.type] || payload.type;
+      
+      window.state.pendingTasks.unshift({
+        id: res.task_id,
+        title: `正在生成: ${typeName}`,
+        type: payload.type,
+        status: 'in_progress',
+        created_at: new Date().toISOString()
+      });
+      localStorage.setItem(`pending_tasks_${notebookId}`, JSON.stringify(window.state.pendingTasks));
+      
       startPollingArtifact(notebookId, res.task_id);
     }
+
+    // 重新刷新列表显示进度
+    await renderArtifactsTab();
   } catch (err) {
     window.showToast(`任务创建失败: ${err.message}`, 'error');
   } finally {
@@ -320,15 +375,39 @@ function startPollingArtifact(notebookId, taskId) {
       const res = await window.apiClient.getArtifactStatus(notebookId, taskId);
       const status = res.status ? res.status.toLowerCase() : '';
       
+      // 更新本地 pendingTasks 中的状态并写入 localStorage
+      if (window.state.pendingTasks) {
+        const pt = window.state.pendingTasks.find(t => t.id === taskId);
+        if (pt && status && pt.status !== status) {
+          pt.status = status;
+          localStorage.setItem(`pending_tasks_${notebookId}`, JSON.stringify(window.state.pendingTasks));
+          await renderArtifactsTab();
+        }
+      }
+
       if (status === 'completed') {
         clearInterval(activePolls[taskId]);
         delete activePolls[taskId];
-        window.showToast(`生成物任务 [ID: ${taskId.slice(0,6)}] 构建就绪！`, 'success');
+        
+        // 从本地 pending 任务中删除
+        if (window.state.pendingTasks) {
+          window.state.pendingTasks = window.state.pendingTasks.filter(t => t.id !== taskId);
+          localStorage.setItem(`pending_tasks_${notebookId}`, JSON.stringify(window.state.pendingTasks));
+        }
+
+        window.showToast(`智能生成物构建就绪！`, 'success');
         await renderArtifactsTab();
       } else if (status === 'failed') {
         clearInterval(activePolls[taskId]);
         delete activePolls[taskId];
-        window.showToast(`生成物任务 [ID: ${taskId.slice(0,6)}] 构建失败。`, 'error');
+
+        // 从本地 pending 任务中删除
+        if (window.state.pendingTasks) {
+          window.state.pendingTasks = window.state.pendingTasks.filter(t => t.id !== taskId);
+          localStorage.setItem(`pending_tasks_${notebookId}`, JSON.stringify(window.state.pendingTasks));
+        }
+
+        window.showToast(`生成物任务构建失败。`, 'error');
         await renderArtifactsTab();
       }
     } catch (e) {
@@ -479,8 +558,9 @@ async function downloadFile(notebookId, type, filename) {
     let ext = '.txt';
     if (type === 'audio') ext = '.mp3';
     else if (type === 'slide-deck') ext = '.pdf';
-    else if (type === 'quiz' || type === 'mind-map') ext = '.json';
+    else if (type === 'quiz' || type === 'mind-map' || type === 'flashcards') ext = '.json';
     else if (type === 'report') ext = '.md';
+    else if (type === 'data-table') ext = '.csv';
 
     link.download = `${filename}${ext}`;
     document.body.appendChild(link);

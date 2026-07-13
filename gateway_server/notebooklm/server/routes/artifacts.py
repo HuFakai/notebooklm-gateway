@@ -371,7 +371,10 @@ async def generate(
         raise ValidationError(
             f"Unknown artifact type {body.type!r}; expected one of {list(GENERATE_TYPES)}"
         )
-    if body.language is not None and not is_supported_language(body.language):
+    # 调用api有需要设置语言时都默认中文 (zh_Hans)
+    if body.language is None:
+        body.language = "zh_Hans"
+    if not is_supported_language(body.language):
         raise ValidationError(f"Unsupported language {body.language!r}")
 
     # Validate caller-supplied per-kind overrides against the choice set for THIS
