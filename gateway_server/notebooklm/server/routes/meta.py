@@ -157,5 +157,5 @@ async def server_info(
                 "reason": startup_error_item["message"],
             }
         else:
-            info["account"] = await _account_block(get_client(request), authenticated=authenticated)
+            info["account"] = await _account_block(await get_client(request), authenticated=authenticated)
     return info

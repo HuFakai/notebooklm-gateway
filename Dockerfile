@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir \
 
 # 将服务端代码拷贝进容器
 COPY gateway_server /app/gateway_server
+COPY noteweb /app/noteweb
 
 # 容器数据卷挂载点 (用于 SQLite 数据库和凭据缓存存放)
 VOLUME /app/data
