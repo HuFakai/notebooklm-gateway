@@ -113,9 +113,9 @@ export async function renderNotesGrid() {
       if (note.content && note.content.length > 100) excerpt += '...';
 
       return `
-        <div class="note-card note-item" data-id="${note.id}">
-          <div class="note-card-title">${note.title}</div>
-          <div class="note-card-excerpt">${excerpt}</div>
+        <div class="note-card note-item" data-id="${window.escapeHTML(note.id)}">
+          <div class="note-card-title">${window.escapeHTML(note.title)}</div>
+          <div class="note-card-excerpt">${window.escapeHTML(excerpt)}</div>
           <div class="note-card-date">📝 卡片</div>
         </div>
       `;

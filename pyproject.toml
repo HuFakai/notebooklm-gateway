@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "notebooklm-gateway"
+version = "0.2.0"
+description = "A multi-tenant thin REST gateway for notebooklm-py"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "cryptography>=44,<46",
+  "email-validator>=2.2,<3",
+  "fastapi>=0.115,<1",
+  "notebooklm-py[markdown]==0.7.3",
+  "python-multipart>=0.0.20,<1",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+client = [
+  "notebooklm-py[browser]==0.7.3",
+  "httpx>=0.28,<1",
+  "PySide6>=6.8,<7",
+]
+test = [
+  "httpx>=0.28,<1",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["gateway_server", "gateway_client"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"noteweb/index.html" = "gateway_server/noteweb/index.html"
+"noteweb/css" = "gateway_server/noteweb/css"
+"noteweb/js" = "gateway_server/noteweb/js"
+"noteweb/THIRD_PARTY_NOTICES.md" = "gateway_server/noteweb/THIRD_PARTY_NOTICES.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

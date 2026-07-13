@@ -1,763 +1,286 @@
-# 📖 NotebookLM Gateway API 接口参考手册 (完全体)
-
-本手册详细梳理了 NotebookLM 极简部署网关服务的**所有 API 规范**。网关服务采用多账户隔离架构，通过不同的外部调用 API Key 进行租户路由。
-
----
-
-## 🔑 鉴权说明
-
-本网关包含两套独立的鉴权体系：
-1.  **网关管理员鉴权 (Admin Auth)**:
-    *   **接口范围**：控制台管理 API、客户端同步凭证 API
-    *   **Header 格式**：`Authorization: Bearer <GATEWAY_ADMIN_TOKEN>`
-2.  **租户业务鉴权 (User Auth)**:
-    *   **接口范围**：笔记本、文档来源、对话、深度探索、笔记、智能生成物及共享管理等业务功能
-    *   **Header 格式**：`Authorization: Bearer <USER_API_KEY>`
-
----
-
-## 🔒 1. 网关管理员管理 API
-
-### 1.1 一键同步/上传客户端凭证
-*   **方法/路径**：`POST /v1/auth/credentials`
-*   **用途**：供本地桌面凭证助手同步登录抓取的 Google 账号凭证。
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "email": "xxxxxx@gmail.com",
-      "api_key": "nmlg_example_key_12345",
-      "master_token": "oauth2_rt_1/...",
-      "storage_state": "{\"cookies\": [...]}"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "ok": true,
-      "message": "Credentials for xxxxxx@gmail.com uploaded and updated successfully."
-    }
-    ```
-
-### 1.2 列出所有托管账户
-*   **方法/路径**：`GET /admin/api/accounts`
-*   **返回示例**：
-    ```json
-    {
-      "ok": true,
-      "accounts": [
-        {
-          "id": 1,
-          "email": "xxxxxx@gmail.com",
-          "api_key": "nmlg_example_key_12345",
-          "status": "active",
-          "updated_at": "2026-07-13 02:40:00"
-        }
-      ]
-    }
-    ```
-
-### 1.3 修改特定账户的调用 Key
-*   **方法/路径**：`PUT /admin/api/accounts/{account_id}/key`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "api_key": "nmlg_new_random_key_67890"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "ok": true,
-      "message": "API Key updated successfully."
-    }
-    ```
-
-### 1.4 切换账户会话状态
-*   **方法/路径**：`PUT /admin/api/accounts/{account_id}/status`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "status": "expired" // 可选: active / expired
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "ok": true,
-      "message": "Account status updated to expired."
-    }
-    ```
-
-### 1.5 删除托管账户
-*   **方法/路径**：`DELETE /admin/api/accounts/{account_id}`
-*   **返回示例**：
-    ```json
-    {
-      "ok": true,
-      "message": "Account deleted successfully."
-    }
-    ```
-
----
-
-## 🌐 2. 租户业务 API (基于 API Key 路由)
-
-### 2.1 系统与元数据 (System & Meta)
-
-#### 2.1.1 获取服务器认证与健康信息
-*   **方法/路径**：`GET /v1/server/info`
-*   **参数**：`include_account=true` (可选，返回当前 API Key 所映射的 Google 账户配额限制及 Identity)
-*   **返回示例**：
-    ```json
-    {
-      "server": "notebooklm-server",
-      "version": "1.0.0",
-      "auth": {
-        "authenticated": true,
-        "storage_exists": true,
-        "json_valid": true,
-        "cookies_present": true,
-        "sid_cookie": true,
-        "profile": "default"
-      },
-      "account": {
-        "email": "xxxxxx@gmail.com",
-        "authuser": "0",
-        "available": true,
-        "notebook_limit": 100,
-        "source_limit": 50,
-        "tier": "free",
-        "output_language": "zh"
-      }
-    }
-    ```
-
----
-
-### 2.2 笔记本管理 (Notebooks)
-
-#### 2.2.1 获取笔记本列表
-*   **方法/路径**：`GET /v1/notebooks`
-*   **返回示例**：
-    ```json
-    {
-      "notebooks": [
-        {
-          "id": "c725a1a9-1b46-4565-9297-f2281acfa9dd",
-          "title": "量子力学研究",
-          "sources_count": 2,
-          "created_at": "2026-07-13T12:00:00Z"
-        }
-      ]
-    }
-    ```
-
-#### 2.2.2 创建笔记本
-*   **方法/路径**：`POST /v1/notebooks`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "新探索的主题"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "c725a1a9-1b46-4565-9297-f2281acfa9dd",
-      "title": "新探索的主题",
-      "sources_count": 0
-    }
-    ```
-
-#### 2.2.3 获取笔记本详情
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}`
-*   **返回示例**：
-    ```json
-    {
-      "id": "c725a1a9-1b46-4565-9297-f2281acfa9dd",
-      "title": "新探索的主题",
-      "sources_count": 0
-    }
-    ```
-
-#### 2.2.4 重命名笔记本
-*   **方法/路径**：`PATCH /v1/notebooks/{notebook_id}`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "改名后的新笔记本"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "status": "renamed",
-      "id": "c725a1a9-1b46-4565-9297-f2281acfa9dd"
-    }
-    ```
-
-#### 2.2.5 删除笔记本
-*   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}`
-*   **返回状态**：`204 No Content`
-
----
-
-### 2.3 文档来源管理 (Sources)
-
-#### 2.3.1 添加自定义文本来源
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/text`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "深空探测技术简史",
-      "text": "文本来源的主体内容..."
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
-      "title": "深空探测技术简史"
-    }
-    ```
-
-#### 2.3.2 上传本地物理文件
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/file`
-*   **请求格式**：`multipart/form-data`
-*   **表单参数**：
-    *   `file`: 物理文件二进制流
-*   **返回示例**：
-    ```json
-    {
-      "id": "8f095783-9acc-4f0f-88f3-54d32f0022ff",
-      "title": "太空物理研究.pdf"
-    }
-    ```
-
-#### 2.3.3 添加网页 URL 来源
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/url`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "url": "https://example.com/page",
-      "allow_internal": false
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "9f095783-9acc-4f0f-88f3-54d32f0033aa",
-      "title": "网页抓取标题"
-    }
-    ```
-
-#### 2.3.4 添加 Google Drive 文档来源
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/drive`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "document_id": "1A2B3C4D...",
-      "mime_type": "google-doc", // 可填: google-doc / google-sheet / pdf 等
-      "title": "可选的自定义文件标题"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "9f095783-9acc-4f0f-88f3-54d32f0044bb",
-      "title": "可选的自定义文件标题"
-    }
-    ```
-
-#### 2.3.5 批量导入网页来源
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/batch`
-*   **说明**：最多支持在一次请求中并行拉取并录入 20 个 URL。
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "urls": [
-        "https://example.com/page1",
-        "https://example.com/page2"
-      ],
-      "allow_internal": false
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "imported": [
-        {
-          "id": "src_12345a",
-          "title": "页面1"
-        },
-        {
-          "id": "src_12345b",
-          "title": "页面2"
-        }
-      ]
-    }
-    ```
-
-#### 2.3.6 获取文档来源列表
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/sources`
-*   **返回示例**：
-    ```json
-    {
-      "sources": [
-        {
-          "id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
-          "title": "深空探测技术简史",
-          "type": "text"
-        }
-      ]
-    }
-    ```
-
-#### 2.3.7 获取特定文档来源的详情/解析状态
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/sources/{source_id}`
-*   **返回示例**：
-    ```json
-    {
-      "id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
-      "title": "深空探测技术简史",
-      "status": "ready", // pending / ready / failed
-      "word_count": 1420
-    }
-    ```
-
-#### 2.3.8 获取文档来源的脱水正文文本
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/sources/{source_id}/text`
-*   **用途**：获取已上传文档被 Google 解析去噪后的原始纯文本（脱水 Markdown）。
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "source_id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
-      "text": "# 深空探测技术简史\n深空探测是指航天器在距离地球200万公里以上的空间..."
-    }
-    ```
-
-#### 2.3.9 同步阻塞等待文档来源就绪
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/sources/wait`
-*   **用途**：在添加文档后，挂起请求等待其在 Google 云端完成全文解析索引（避免未就绪时发起对话报错）。
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "source_ids": ["7f085783-9acc-4f0f-88f3-54d32f0011e8"], // 留空则等待全部来源就绪
-      "timeout": 120.0, // 超时时间（秒）
-      "interval": 1.0 // 轮询间隔（秒）
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "ready": true,
-      "source_ids": ["7f085783-9acc-4f0f-88f3-54d32f0011e8"]
-    }
-    ```
-
-#### 2.3.10 重命名来源标题
-*   **方法/路径**：`PATCH /v1/notebooks/{notebook_id}/sources/{source_id}`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "全新改写后的参考文件名称"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "7f085783-9acc-4f0f-88f3-54d32f0011e8",
-      "title": "全新改写后的参考文件名称"
-    }
-    ```
-
-#### 2.3.11 删除特定文档来源
-*   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/sources/{source_id}`
-*   **返回状态**：`204 No Content`
-
----
-
-### 2.4 智能对话与配置 (Chat)
-
-#### 2.4.1 配置对话行为 / Preset (含自定义 Persona/Goal 设定)
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/chat/configure`
-*   **说明**：支持选用 predefined 预设，或使用 `"goal"` 来直接传递自由意志的个性化 System Prompt 指令！
-*   **请求 Body (JSON)**：
-    *   *方式 A：经典预设模式*
-    ```json
-    {
-      "chat_mode": "concise" // default / learning-guide / concise / detailed
-    }
-    ```
-    *   *方式 B：自定义 Persona 设定*
-    ```json
-    {
-      "chat_mode": null,
-      "goal": "你是一个深空探索的领航员，请用富有科幻感和冷酷理性的语气回答问题。",
-      "response_length": "short" // short / default / long
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "status": "configured"
-    }
-    ```
-
-#### 2.4.2 获取引导提问的建议提示词
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/suggested-prompts`
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "suggestions": [
-        {
-          "title": "关于这篇简史的3个核心推论是什么？",
-          "prompt": "基于已载入的文章内容，梳理并向我阐释..."
-        }
-      ]
-    }
-    ```
-
-#### 2.4.3 发起对话 (支持 SSE 流式返回)
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/chat`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "question": "中国嫦娥探测器起到了什么作用？",
-      "conversation_id": null
-    }
-    ```
-*   **响应流 (Server-Sent Events)**：返回格式为 `data: <JSON>` 字符串，直到以 `data: [DONE]` 截止：
-    ```text
-    data: {"text": "中"}
-    data: {"text": "国"}
-    data: [DONE]
-    ```
-
----
-
-### 2.5 深度探索与搜索集成 (Deep Research)
-
-#### 2.5.1 启动研究会话
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/research`
-*   **请求 Body (JSON)**：
-    *   `query`: 搜索/研究关键词
-    *   `source`: 数据来源 (可填 `web` / `drive`)，默认为 `web`
-    *   `mode`: 研究深度 (可填 `fast` / `deep`)，默认为 `fast`
-    ```json
-    {
-      "query": "2026年量子计算机最新进展",
-      "source": "web",
-      "mode": "fast"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "task_id": "res_task_9a2b8c3d4e",
-      "poll_id": "res_task_9a2b8c3d4e",
-      "notebook_id": "c725a1a9..."
-    }
-    ```
-
-#### 2.5.2 轮询研究进度与结果
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/research/{run_id}`
-*   **说明**：`run_id` 为上一接口返回的 `poll_id`
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "run_id": "res_task_9a2b8c3d4e",
-      "status": "completed",
-      "sources": [
-        {
-          "title": "量子芯片进展报告",
-          "url": "https://example.com/quantum"
-        }
-      ],
-      "report": "量子计算机在拓扑量子比特纠错上取得了重要突破..."
-    }
-    ```
-
-#### 2.5.3 取消进行中的研究任务
-*   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/research/{run_id}`
-*   **返回示例**：
-    ```json
-    {
-      "status": "cancelled",
-      "notebook_id": "c725a1a9...",
-      "run_id": "res_task_9a2b8c3d4e",
-      "cancelled": true
-    }
-    ```
-
-#### 2.5.4 将研究成果源导入到笔记本中
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/research/{run_id}/import`
-*   **返回示例**：
-    ```json
-    {
-      "status": "imported",
-      "notebook_id": "c725a1a9...",
-      "run_id": "res_task_9a2b8c3d4e",
-      "sources_found": 1,
-      "imported": [
-        {
-          "id": "src_quantum_abcde",
-          "title": "量子芯片进展报告"
-        }
-      ]
-    }
-    ```
-
----
-
-### 2.6 笔记管理 (Notes)
-
-#### 2.6.1 创建笔记
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/notes`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "我的航天梦笔记",
-      "content": "宇宙的尽头是无尽的奥秘待发掘。"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "0f0d1b7c-4468-45a3-b380-96c7406985cb",
-      "title": "我的航天梦笔记",
-      "content": "宇宙的尽头是无尽的奥秘待发掘。"
-    }
-    ```
-
-#### 2.6.2 获取全部笔记列表
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/notes`
-*   **返回示例**：
-    ```json
-    {
-      "notes": [
-        {
-          "id": "0f0d1b7c-4468-45a3-b380-96c7406985cb",
-          "title": "我的航天梦笔记",
-          "content": "宇宙的尽头是无尽的奥秘待发掘。"
-        }
-      ]
-    }
-    ```
-
-#### 2.6.3 修改笔记内容
-*   **方法/路径**：`PUT /v1/notebooks/{notebook_id}/notes/{note_id}`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "我的航天梦笔记(已修改)",
-      "content": "修改后的内容：引力波与量子物理学正在加速融合。"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "id": "0f0d1b7c-4468-45a3-b380-96c7406985cb",
-      "title": "我的航天梦笔记(已修改)",
-      "content": "修改后的内容：引力波与量子物理学正在加速融合。"
-    }
-    ```
-
-#### 2.6.4 删除笔记
-*   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/notes/{note_id}`
-*   **返回状态**：`204 No Content`
-
----
-
-### 2.7 智能生成物构建 (Artifacts & Studio)
-
-#### 2.7.1 发起异步生成物构建
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts`
-*   **说明**：向 NotebookLM Studio 发起构建指令，此操作为非阻塞（异步），会直接秒级返回任务 ID，您可以稍后轮询任务进度。
-*   **请求 Body (JSON) 详细选项规范**：
-    *   `type`: 生成类型 (`audio` [音频播客] / `video` [视频] / `slide-deck` [幻灯片] / `quiz` [测验] / `flashcards` [闪卡] / `infographic` [信息图] / `data-table` [数据表格] / `mind-map` [脑图] / `report` [研究简报])
-    *   不同类型专属的可选参数：
-        *   `audio` (播客) -> `audio_format` (`deep-dive` / `brief` / `critique` / `debate`), `audio_length` (`short` / `default` / `long`)
-        *   `video` (视频) -> `video_format` (`explainer` / `brief` / `cinematic` / `short`), `style` (`auto` / `custom` / `watercolor` / `anime` 等)
-        *   `slide-deck` (幻灯片) -> `deck_format` (`detailed` / `presenter`), `deck_length` (`default` / `short`)
-        *   `quiz` (测验) & `flashcards` (闪卡) -> `quantity` (`fewer` / `standard` / `more`), `difficulty` (`easy` / `medium` / `hard`)
-        *   `infographic` (信息图) -> `orientation` (`landscape` / `portrait` / `square`), `detail` (`concise` / `standard` / `detailed`), `style`
-        *   `mind-map` (脑图) -> `map_kind` (`interactive` / `note-backed`)
-        *   `report` (研究简报) -> `report_format` (`briefing-doc` / `study-guide` / `blog-post` / `custom`)
-    *   *示例 (一键生成高品质答卷测验)*：
-    ```json
-    {
-      "type": "quiz",
-      "quantity": "standard",
-      "difficulty": "hard",
-      "instructions": "出一份关于量子纠缠的硬核单选题测试卷。"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "task_id": "gen_task_6f8b9a1c2d3e"
-    }
-    ```
-
-#### 2.7.2 获取全部生成物列表
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/artifacts`
-*   **返回示例**：
-    ```json
-    {
-      "artifacts": [
-        {
-          "id": "art_pod_12345",
-          "title": "我的航天梦-音频对话播客",
-          "type": "audio"
-        }
-      ]
-    }
-    ```
-
-#### 2.7.3 轮询生成任务进度与状态
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/artifacts/{task_id}`
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "task_id": "gen_task_6f8b9a1c2d3e",
-      "status": "completed" // PENDING / IN_PROGRESS / COMPLETED / FAILED
-    }
-    ```
-
-#### 2.7.4 获取针对该生成物的背景 Prompt
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/artifacts/{artifact_id}/prompt`
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "artifact_id": "art_pod_12345",
-      "prompt": "帮我把目前的所有文档提炼为一份高层研究简报。"
-    }
-    ```
-
-#### 2.7.5 重命名生成物标题
-*   **方法/路径**：`PATCH /v1/notebooks/{notebook_id}/artifacts/{artifact_id}`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "title": "我的航天梦-精选版播客"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "status": "renamed",
-      "notebook_id": "c725a1a9...",
-      "artifact_id": "art_pod_12345",
-      "new_title": "我的航天梦-精选版播客"
-    }
-    ```
-
-#### 2.7.6 重试失败的生成任务
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts/{artifact_id}/retry`
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "artifact_id": "art_pod_12345",
-      "task_id": "art_pod_12345",
-      "status": "pending"
-    }
-    ```
-
-#### 2.7.7 下载生成的二进制媒体文件 (如音频或幻灯片 PDF)
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts/download`
-*   **请求 Body (JSON)**：
-    *   `type`: 下载类型，例如 `audio`、`slide-deck` 等
-    ```json
-    {
-      "type": "audio"
-    }
-    ```
-*   **返回流**：二进制字节流 (以 `FileResponse` 返回物理文件，并自动在下载完成后清理网关服务器上的临时缓存)。
-
-#### 2.7.8 彻底删除生成物
-*   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/artifacts/{artifact_id}`
-*   **返回状态**：`204 No Content`
-
----
-
-### 2.8 笔记本共享管理 (Share)
-
-#### 2.8.1 获取共享状态
-*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/share`
-*   **返回示例**：
-    ```json
-    {
-      "public_access": "disabled",
-      "shared_users": [
-        {
-          "email": "collaborator@example.com",
-          "permission": "viewer"
-        }
-      ]
-    }
-    ```
-
-#### 2.8.2 开启/禁用公开链接分享
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/share/public`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "enable": true
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "public_access": "enabled",
-      "shared_users": []
-    }
-    ```
-
-#### 2.8.3 添加协作者
-*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/share/users`
-*   **请求 Body (JSON)**：
-    *   `permission`: 可填 `viewer` / `editor`
-    ```json
-    {
-      "email": "partner@example.com",
-      "permission": "editor",
-      "notify": false
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "email": "partner@example.com",
-      "permission": "editor",
-      "notify": false
-    }
-    ```
-
-#### 2.8.4 更改协作者的读写权限
-*   **方法/路径**：`PATCH /v1/notebooks/{notebook_id}/share/users/{email}`
-*   **请求 Body (JSON)**：
-    ```json
-    {
-      "permission": "viewer"
-    }
-    ```
-*   **返回示例**：
-    ```json
-    {
-      "notebook_id": "c725a1a9...",
-      "email": "partner@example.com",
-      "permission": "viewer"
-    }
-    ```
-
-#### 2.8.5 移除协作者权限
-*   **方法/路径**：`DELETE /v1/notebooks/{notebook_id}/share/users/{email}`
-*   **返回状态**：`204 No Content`
+# NotebookLM Gateway REST API
+
+本文对应网关 `0.2.0` 和 `notebooklm-py==0.7.3`。运行服务后，`/docs` 提供由实际 Pydantic Schema 生成的交互式 OpenAPI。
+
+## 约定
+
+Base URL 示例：`http://localhost:18388`。
+
+除 `/healthz`、静态页面和 OpenAPI 外，所有接口使用：
+
+```http
+Authorization: Bearer <TOKEN>
+```
+
+Token 分为两类，不能混用：
+
+| 类型 | 可访问范围 |
+| --- | --- |
+| 管理 Token | `POST /v1/auth/credentials`、`/admin/api/*` |
+| 用户 API Key | `GET /v1/server/info`、`/v1/notebooks/*` |
+
+管理 Token 调用业务 API 返回 `403`；无效、缺失或停用的用户 Key 返回 `401`。
+
+普通 JSON 错误格式为：
+
+```json
+{"detail": "error message"}
+```
+
+上游 SDK 错误另有 `"upstream": true`。常见状态码：`400` 参数错误、`401/403` 认证错误、`404` 不存在、`409` 冲突、`413` 文件过大、`422` Schema 校验失败、`429` 上游限流、`502` 上游错误、`504` 等待超时。
+
+## 管理和账户
+
+### 上传或刷新凭据
+
+`POST /v1/auth/credentials`，使用管理 Token。
+
+```json
+{
+  "email": "user@example.com",
+  "api_key": "unique-user-api-key",
+  "storage_state": "{\"cookies\":[...],\"origins\":[]}",
+  "master_token": "",
+  "android_id": ""
+}
+```
+
+- `api_key`：16–256 字符，不能含空白；不同账户必须唯一。
+- `storage_state`：JSON 字符串，顶层必须是对象且包含 `cookies` 数组。
+- `master_token`、`android_id`：只为旧数据兼容保留，方案 A 不依赖它们。
+- 同一邮箱再次上传会更新凭据、使旧 SDK 客户端失效，并把账户状态恢复为 `active`。
+
+### 管理路由
+
+| 方法 | 路径 | 请求体/说明 |
+| --- | --- | --- |
+| `GET` | `/admin/api/accounts` | 账户列表 |
+| `DELETE` | `/admin/api/accounts/{account_id}` | 删除账户与其任务记录 |
+| `PUT` | `/admin/api/accounts/{account_id}/status` | `{"status":"active|disabled|expired"}` |
+| `PUT` | `/admin/api/accounts/{account_id}/key` | `{"api_key":"new-unique-key"}` |
+
+管理控制台位于 `/admin`。
+
+## 系统信息
+
+`GET /v1/server/info` 返回网关版本、SDK 版本、当前账户和能力列表：
+
+```json
+{
+  "name": "notebooklm-gateway",
+  "version": "0.2.0",
+  "sdk_version": "0.7.3",
+  "account": {"id": 1, "email": "user@example.com", "status": "active"},
+  "capabilities": {
+    "multi_tenant": true,
+    "persistent_jobs": true,
+    "artifact_types": ["audio", "video", "cinematic_video", "report", "quiz", "flashcards", "infographic", "slide_deck", "data_table", "mind_map"]
+  }
+}
+```
+
+`GET /healthz` 无需认证，成功返回 `{"status":"ok"}`。
+
+## 笔记本
+
+| 方法 | 路径 | 请求体/响应 |
+| --- | --- | --- |
+| `GET` | `/v1/notebooks` | `{"notebooks":[...]}` |
+| `POST` | `/v1/notebooks` | `{"title":"标题"}`，返回 `201` |
+| `GET` | `/v1/notebooks/{notebook_id}` | 获取详情 |
+| `PATCH` | `/v1/notebooks/{notebook_id}` | `{"title":"新标题"}` |
+| `DELETE` | `/v1/notebooks/{notebook_id}` | 返回 `204` |
+| `GET` | `/v1/notebooks/{notebook_id}/description` | 描述、摘要和建议主题 |
+| `GET` | `/v1/notebooks/{notebook_id}/suggested-prompts` | `{"suggestions":[...]}` |
+
+## 来源
+
+所有路径以 `/v1/notebooks/{notebook_id}` 开头。
+
+| 方法 | 后缀 | 请求体/说明 |
+| --- | --- | --- |
+| `GET` | `/sources` | `{"sources":[...]}` |
+| `GET` | `/sources/{source_id}` | 来源详情 |
+| `POST` | `/sources/url` | `{"url":"https://..."}` |
+| `POST` | `/sources/text` | `{"title":"标题","text":"正文"}` |
+| `POST` | `/sources/drive` | `{"file_id":"...","title":"...","mime_type":"application/vnd.google-apps.document"}` |
+| `POST` | `/sources/batch` | `{"urls":["https://...",...]}`，最多 50 条，分别返回成功与错误 |
+| `POST` | `/sources/file` | `multipart/form-data`，字段名 `file` |
+| `POST` | `/sources/wait` | `{"source_ids":[],"timeout":120,"interval":1}`；空列表等待全部来源 |
+| `GET` | `/sources/{source_id}/text` | 获取去噪全文；`/content` 是同义路径 |
+| `GET` | `/sources/{source_id}/guide` | 来源学习指南 |
+| `PATCH` | `/sources/{source_id}` | `{"title":"新标题"}` |
+| `DELETE` | `/sources/{source_id}` | 返回 `204` |
+
+文件上传限制由 `GATEWAY_MAX_UPLOAD_BYTES` 控制，临时文件在成功或失败后都会删除。
+
+## 对话
+
+### 提问
+
+`POST /v1/notebooks/{notebook_id}/chat`
+
+```json
+{
+  "question": "归纳三项关键结论",
+  "source_ids": ["source-id"],
+  "conversation_id": null
+}
+```
+
+返回 SDK 的完整对话响应，包括回答、会话 ID 和引用信息。这是普通 JSON 响应，不是 SSE；NoteWeb 在客户端执行渐显效果。
+
+### 配置
+
+`POST /v1/notebooks/{notebook_id}/chat/configure`
+
+使用预设模式：
+
+```json
+{"chat_mode":"learning_guide"}
+```
+
+`chat_mode` 可选 `default`、`learning_guide`、`concise`、`detailed`。
+
+或使用目标配置：
+
+```json
+{
+  "chat_mode": null,
+  "goal": "custom",
+  "response_length": "longer",
+  "custom_prompt": "以资深研究员身份回答"
+}
+```
+
+`goal` 可选 `default`、`custom`、`learning_guide`；`response_length` 可选 `default`、`shorter`、`longer`。
+
+## 深度研究
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/v1/notebooks/{notebook_id}/research` | `{"query":"...","source":"web|drive","mode":"fast|deep"}`，返回 `202` |
+| `GET` | `/v1/notebooks/{notebook_id}/research/{run_id}` | 查询进度和结果 |
+| `POST` | `/v1/notebooks/{notebook_id}/research/{run_id}/import` | 导入结果来源；请求体可省略，也可传 `{"sources":[...]}` |
+| `DELETE` | `/v1/notebooks/{notebook_id}/research/{run_id}` | 稳定版 SDK 无公开取消 API，固定返回 `501` |
+
+## 笔记
+
+| 方法 | 路径 | 请求体/说明 |
+| --- | --- | --- |
+| `GET` | `/v1/notebooks/{notebook_id}/notes` | `{"notes":[...]}` |
+| `GET` | `/v1/notebooks/{notebook_id}/notes/{note_id}` | 获取笔记 |
+| `POST` | `/v1/notebooks/{notebook_id}/notes` | `{"title":"...","content":"..."}`，返回 `201` |
+| `PUT` | `/v1/notebooks/{notebook_id}/notes/{note_id}` | 同上 |
+| `DELETE` | `/v1/notebooks/{notebook_id}/notes/{note_id}` | 返回 `204` |
+
+## Studio 生成物
+
+### 创建
+
+`POST /v1/notebooks/{notebook_id}/artifacts`，成功返回 `202`。公共参数：
+
+```json
+{
+  "type": "audio",
+  "source_ids": ["source-id"],
+  "language": "zh_Hans",
+  "instructions": "面向初学者，先讲概念再讲案例"
+}
+```
+
+- `type` 必填。
+- `source_ids` 省略或为 `null` 时使用上游默认（通常为全部来源）。
+- `language` 默认 `zh_Hans`。NoteWeb 还提供 `zh_Hant`、`en`、`ja`、`ko`、`es`、`fr`、`de`。
+- `instructions` 最长 20,000 字符。
+
+类型参数：
+
+| `type` | 专属字段 | 可选值 |
+| --- | --- | --- |
+| `audio` | `audio_format` | `deep_dive`、`brief`、`critique`、`debate` |
+|  | `audio_length` | `short`、`default`、`long` |
+| `video` | `video_format` | `explainer`、`brief`、`cinematic` |
+|  | `video_style` | `auto_select`、`custom`、`classic`、`whiteboard`、`kawaii`、`anime`、`watercolor`、`retro_print`、`heritage`、`paper_craft` |
+|  | `style_prompt` | 自定义视觉风格，最长 10,000 字符；`video_style=custom` 时使用 |
+| `cinematic_video` | 无 | 使用公共参数 |
+| `report` | `report_format` | `briefing_doc`、`study_guide`、`blog_post`、`custom` |
+|  | `custom_prompt` | 自定义报告结构 |
+|  | `extra_instructions` | 附加写作要求；未提供时回退到 `instructions` |
+| `quiz` / `flashcards` | `quantity` | `fewer`、`standard`、`more` |
+|  | `difficulty` | `easy`、`medium`、`hard` |
+| `infographic` | `orientation` | `landscape`、`portrait`、`square` |
+|  | `detail_level` | `concise`、`standard`、`detailed` |
+|  | `infographic_style` | `auto_select`、`sketch_note`、`professional`、`bento_grid`、`editorial`、`instructional`、`bricks`、`clay`、`anime`、`kawaii`、`scientific` |
+| `slide_deck` | `slide_format` | `detailed_deck`、`presenter_slides` |
+|  | `slide_length` | `default`、`short` |
+| `data_table` / `mind_map` | 无 | 使用公共参数 |
+
+完整示例：
+
+```json
+{
+  "type": "video",
+  "source_ids": ["source-a", "source-b"],
+  "language": "zh_Hans",
+  "instructions": "制作五分钟产品说明",
+  "video_format": "explainer",
+  "video_style": "custom",
+  "style_prompt": "深色编辑风格、蓝色数据可视化、克制的镜头运动"
+}
+```
+
+### 查询与任务持久化
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/v1/notebooks/{notebook_id}/artifacts` | 上游生成物与本网关未完成任务的合并列表；同时返回 `jobs` |
+| `GET` | `/v1/notebooks/{notebook_id}/artifacts/{task_id}` | 轮询本网关登记的任务；跨账户、跨笔记本或未知任务返回 `404` |
+| `GET` | `/v1/notebooks/{notebook_id}/artifacts/{artifact_id}/prompt` | 返回创建时记录的指令和完整参数 |
+| `PATCH` | `/v1/notebooks/{notebook_id}/artifacts/{artifact_id}` | `{"title":"新标题"}` |
+| `POST` | `/v1/notebooks/{notebook_id}/artifacts/{artifact_id}/retry` | 重试有本网关任务记录的失败生成物，返回 `202` |
+| `DELETE` | `/v1/notebooks/{notebook_id}/artifacts/{artifact_id}` | 返回 `204` |
+
+任务记录写入 SQLite，因此进程重启不会丢失。`prompt` 返回的是本网关保存的创建参数，不调用上游私有 Prompt API。
+
+### 下载
+
+`POST /v1/notebooks/{notebook_id}/artifacts/download`
+
+```json
+{
+  "type": "slide_deck",
+  "artifact_id": "artifact-id",
+  "output_format": "pptx"
+}
+```
+
+`artifact_id` 必填，以避免误下载“最新”生成物。下载对应关系：
+
+| 类型 | 默认格式 | 可选 `output_format` |
+| --- | --- | --- |
+| `audio` | MP3 | — |
+| `video` | MP4 | — |
+| `report` | Markdown | — |
+| `quiz` / `flashcards` | JSON | `markdown` |
+| `infographic` | PNG | — |
+| `slide_deck` | PDF | `pptx` |
+| `data_table` | CSV | — |
+| `mind_map` | JSON | — |
+
+`cinematic_video` 完成后在上游表现为视频生成物，下载时使用 `type: "video"`。
+
+## 共享
+
+| 方法 | 路径 | 请求体/说明 |
+| --- | --- | --- |
+| `GET` | `/v1/notebooks/{notebook_id}/share` | 当前公开状态、URL 与协作者 |
+| `POST` | `/v1/notebooks/{notebook_id}/share/public` | `{"public":true}` |
+| `POST` | `/v1/notebooks/{notebook_id}/share/users` | `{"email":"a@example.com","permission":"viewer|editor","notify":true,"welcome_message":""}` |
+| `PATCH` | `/v1/notebooks/{notebook_id}/share/users/{email}` | `{"permission":"viewer|editor"}`；邮箱需 URL 编码 |
+| `DELETE` | `/v1/notebooks/{notebook_id}/share/users/{email}` | 返回 `204` |
+| `POST` | `/v1/notebooks/{notebook_id}/share/view-level` | `{"level":"full_notebook|chat_only"}` |
+
+## 兼容性原则
+
+网关只导入 `notebooklm` 顶层公开对象和公开类型；不保证兼容旧版内嵌 Server 的私有路由、字段或 SSE 格式。SDK 升级必须先核对公开签名、更新 Schema 与本文档，并完成测试后再修改精确版本锁。

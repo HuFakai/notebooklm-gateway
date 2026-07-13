@@ -511,8 +511,8 @@
     </main>
 
     <script>
-        // 检测本地是否已有 Token
-        const savedToken = localStorage.getItem('gateway_admin_token');
+        // 管理令牌仅保存在当前标签页会话中，关闭后自动清除。
+        const savedToken = sessionStorage.getItem('gateway_admin_token');
         if (savedToken) {
             document.getElementById('loginOverlay').style.display = 'none';
             fetchAccounts(savedToken);
@@ -569,7 +569,7 @@
             
             const success = await fetchAccounts(token);
             if (success) {
-                localStorage.setItem('gateway_admin_token', token);
+                sessionStorage.setItem('gateway_admin_token', token);
                 document.getElementById('loginOverlay').style.display = 'none';
             } else {
                 showModal({
@@ -583,14 +583,14 @@
         }
 
         function logout() {
-            localStorage.removeItem('gateway_admin_token');
+            sessionStorage.removeItem('gateway_admin_token');
             document.getElementById('loginOverlay').style.display = 'flex';
-            document.getElementById('accountsTableBody').innerHTML = '';
+            document.getElementById('accountsTableBody').replaceChildren();
             document.getElementById('statCount').innerText = '0';
         }
 
         async function fetchAccounts(token) {
-            const targetToken = token || localStorage.getItem('gateway_admin_token');
+            const targetToken = token || sessionStorage.getItem('gateway_admin_token');
             if (!targetToken) return false;
 
             try {
@@ -618,7 +618,7 @@
         function renderTable(accounts) {
             const tbody = document.getElementById('accountsTableBody');
             const empty = document.getElementById('emptyState');
-            tbody.innerHTML = '';
+            tbody.replaceChildren();
             
             document.getElementById('statCount').innerText = accounts.length;
             
@@ -640,18 +640,25 @@
                 // API Key 列
                 const tdKey = document.createElement('td');
                 tdKey.className = 'key-cell';
-                tdKey.innerHTML = `
-                    <code>${acc.api_key}</code>
-                    <button class="btn-action" onclick="copyToClipboard('${acc.api_key}', this)">复制</button>
-                    <span class="copy-msg">已复制</span>
-                `;
+                const keyCode = document.createElement('code');
+                keyCode.textContent = acc.api_key;
+                const copyButton = document.createElement('button');
+                copyButton.className = 'btn-action';
+                copyButton.textContent = '复制';
+                copyButton.onclick = () => copyToClipboard(acc.api_key, copyButton);
+                const copyMessage = document.createElement('span');
+                copyMessage.className = 'copy-msg';
+                copyMessage.textContent = '已复制';
+                tdKey.append(keyCode, copyButton, copyMessage);
                 tr.appendChild(tdKey);
 
                 // 状态列
                 const tdStatus = document.createElement('td');
                 const badge = document.createElement('span');
                 badge.className = `status-badge ${acc.status}`;
-                badge.innerHTML = `<span class="status-dot"></span>${acc.status === 'active' ? '正常' : '已停用'}`;
+                const statusDot = document.createElement('span');
+                statusDot.className = 'status-dot';
+                badge.append(statusDot, document.createTextNode(acc.status === 'active' ? '正常' : '已停用'));
                 tdStatus.appendChild(badge);
                 tr.appendChild(tdStatus);
 
@@ -712,7 +719,7 @@
                         return;
                     }
 
-                    const token = localStorage.getItem('gateway_admin_token');
+                    const token = sessionStorage.getItem('gateway_admin_token');
                     try {
                         const response = await fetch(`/admin/api/accounts/${id}/key`, {
                             method: 'PUT',
@@ -754,7 +761,7 @@
                 desc: `您确定要将托管账号 ${email} 变更为【${actionText}】状态吗？`,
                 showInput: false,
                 onConfirm: async () => {
-                    const token = localStorage.getItem('gateway_admin_token');
+                    const token = sessionStorage.getItem('gateway_admin_token');
                     try {
                         const response = await fetch(`/admin/api/accounts/${id}/status`, {
                             method: 'PUT',
@@ -783,7 +790,7 @@
                 desc: `您确认要删除托管账号 ${email} 及其关联的所有 API Key 吗？此操作不可逆。`,
                 showInput: false,
                 onConfirm: async () => {
-                    const token = localStorage.getItem('gateway_admin_token');
+                    const token = sessionStorage.getItem('gateway_admin_token');
                     try {
                         const response = await fetch(`/admin/api/accounts/${id}`, {
                             method: 'DELETE',

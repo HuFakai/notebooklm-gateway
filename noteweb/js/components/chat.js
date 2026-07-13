@@ -1,6 +1,6 @@
 /**
  * NoteWeb - Chat Component
- * 管理智能对话、推荐提问词列表、自定义 System Prompt / Goal 配置及 SSE 响应式流渲染
+ * 管理智能对话、推荐提问词列表、自定义 System Prompt / Goal 配置及客户端渐显渲染
  */
 
 let activeConversationId = null;
@@ -80,7 +80,7 @@ export async function renderChatTab() {
     if (suggestions && suggestions.length > 0) {
       suggestionsContainer.classList.remove('hidden');
       chipsContainer.innerHTML = suggestions.map(s => `
-        <div class="suggestion-chip" data-prompt="${encodeURIComponent(s.prompt)}">${s.title}</div>
+        <div class="suggestion-chip" data-prompt="${encodeURIComponent(s.prompt)}">${window.escapeHTML(s.question || s.prompt)}</div>
       `).join('');
 
       // 绑定芯片点击
@@ -103,7 +103,7 @@ export async function renderChatTab() {
   }
 }
 
-// 发送提问并在消息框内流式渲染 SSE 结果
+// 发送提问并在消息框内渐显普通 JSON 响应
 async function sendChatMessage() {
   const notebookId = window.state.currentNotebookId;
   const inputEl = document.getElementById('chat-input');
@@ -182,7 +182,8 @@ async function sendChatMessage() {
       if (bubble.classList.contains('loading-stream')) {
         bubble.classList.remove('loading-stream');
       }
-      bubble.innerHTML = `<span style="color:var(--neon-red);">错误: ${err.message}</span>`;
+      bubble.textContent = `错误: ${err.message}`;
+      bubble.style.color = 'var(--neon-red)';
       messagesList.scrollTop = messagesList.scrollHeight;
     }
   );
@@ -197,11 +198,12 @@ function renderReferences(messageEl, references) {
   references.forEach((ref, idx) => {
     const chip = document.createElement('span');
     chip.className = 'ref-chip';
-    chip.textContent = `${idx + 1}. ${ref.source_title || '未命名文档'}`;
+    chip.textContent = `${idx + 1}. ${ref.source_title || ref.source_id || '未命名文档'}`;
     
     // 点击小卡片，弹窗展示精确引用的原文文本
     chip.addEventListener('click', () => {
-      alert(`引用自《${ref.source_title}》的原文片段：\n\n${ref.quotes.join('\n\n')}`);
+      const passage = ref.cited_text || (Array.isArray(ref.quotes) ? ref.quotes.join('\n\n') : '上游未返回引用原文');
+      alert(`引用来源：${ref.source_title || ref.source_id || '未知'}\n\n${passage}`);
     });
     refList.appendChild(chip);
   });

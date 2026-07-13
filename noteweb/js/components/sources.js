@@ -34,11 +34,11 @@ export function renderSourcesList() {
   container.innerHTML = window.state.sources.map(src => {
     // 根据来源类型匹配图标
     let iconSvg = '';
-    if (src.type === 'text') {
+    if (['text', 'pasted_text'].includes(src.type)) {
       iconSvg = `<svg class="item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`;
-    } else if (src.type === 'url') {
+    } else if (['url', 'web_page', 'youtube'].includes(src.type)) {
       iconSvg = `<svg class="item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
-    } else if (src.type === 'drive') {
+    } else if (['drive', 'google_docs', 'google_slides', 'google_sheets'].includes(src.type)) {
       iconSvg = `<svg class="item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19L17 5H7L2 19H22Z"/><path d="M12 2V5"/></svg>`;
     } else {
       // 默认文件
@@ -48,22 +48,22 @@ export function renderSourcesList() {
     // 状态修饰
     let statusClass = '';
     let statusTip = '';
-    if (src.status === 'pending') {
+    if (['pending', 'processing'].includes(src.status)) {
       statusClass = 'source-pending';
       statusTip = ' [解析中]';
-    } else if (src.status === 'failed') {
+    } else if (['failed', 'error'].includes(src.status)) {
       statusClass = 'source-failed';
       statusTip = ' [失败]';
     }
 
     return `
-      <div class="list-item source-item ${statusClass}" data-id="${src.id}">
+      <div class="list-item source-item ${statusClass}" data-id="${window.escapeHTML(src.id)}">
         <div class="item-info">
           ${iconSvg}
-          <span class="item-name" title="${src.title}${statusTip}">${src.title}${statusTip}</span>
+          <span class="item-name" title="${window.escapeHTML((src.title || '未命名来源') + statusTip)}">${window.escapeHTML((src.title || '未命名来源') + statusTip)}</span>
         </div>
         <div class="item-actions">
-          <button class="section-action-btn delete-src-btn" data-id="${src.id}" title="删除该来源">
+          <button class="section-action-btn delete-src-btn" data-id="${window.escapeHTML(src.id)}" title="删除该来源">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -121,7 +121,8 @@ async function viewSourceText(sourceId) {
     const text = await window.apiClient.getSourceText(window.state.currentNotebookId, sourceId);
     contentDisplay.innerHTML = window.renderMarkdown(text || "该参考源无文本内容。");
   } catch (err) {
-    contentDisplay.innerHTML = `<p style="color:var(--neon-red);">拉取正文失败: ${err.message}</p>`;
+    contentDisplay.textContent = `拉取正文失败: ${err.message}`;
+    contentDisplay.style.color = 'var(--neon-red)';
   }
 }
 
@@ -296,9 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         // 调用 Drive 源接口
         const res = await window.apiClient.request('POST', `/v1/notebooks/${notebookId}/sources/drive`, {
-          document_id: docId,
+          file_id: docId,
           mime_type: mimeType,
-          title
+          title: title || docId
         });
         window.closeModal('modal-add-source');
         waitAndRefreshSources(notebookId, [res.id]);

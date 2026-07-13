@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NotebookLM Web 极简智能笔记控制台</title>
+  <title>NotebookLM Web · Liquid Knowledge Studio</title>
   <!-- 引入现代字体 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
   <!-- 引入本项目的 CSS -->
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -20,6 +20,7 @@
   </div>
 
   <div class="app-layout">
+    <button type="button" id="btn-mobile-nav" class="mobile-nav-button" aria-label="打开导航" aria-expanded="false">☰</button>
     <!-- 1. 左侧边栏 (控制面板 & 笔记本列表 & 文档来源) -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -38,7 +39,7 @@
       </div>
 
       <!-- 当前账户简要状态 -->
-      <div id="account-badge" class="account-badge unconfigured">
+      <div id="account-badge" class="account-badge unconfigured" data-liquid-glass="compact">
         <div class="badge-dot"></div>
         <span id="badge-email">未配置 API 密钥</span>
       </div>
@@ -82,7 +83,7 @@
     <main class="main-content">
       <!-- 未选择笔记本的初始空白状态 -->
       <div id="main-empty-view" class="main-empty-view">
-        <div class="empty-hero">
+        <div class="empty-hero" data-liquid-glass="panel">
           <svg class="hero-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.168.477 4.253 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
@@ -115,7 +116,7 @@
           </div>
 
           <!-- Tab 标签页切换 -->
-          <nav class="tab-nav">
+          <nav class="tab-nav" data-liquid-glass="compact">
             <button class="tab-btn active" data-tab="guide">
               <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
               <span>笔记本指南</span>
@@ -235,7 +236,7 @@
               </div>
 
               <!-- 输入控制区域 -->
-              <div class="chat-input-area">
+              <div class="chat-input-area" data-liquid-glass="compact">
                 <button id="btn-chat-configure" class="icon-btn" title="配置对话设定">
                   <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/>
@@ -312,7 +313,7 @@
                     <span></span><span></span><span></span><span></span>
                   </div>
                   <p id="research-status-text">正在初始化研究管道...</p>
-                  <button id="btn-cancel-research" class="btn btn-danger btn-sm">取消研究</button>
+                  <button id="btn-cancel-research" class="btn btn-danger btn-sm" disabled title="稳定版 notebooklm-py 0.7.3 暂未公开研究取消 API">暂不支持取消</button>
                 </div>
 
                 <div id="research-report-view" class="research-report-view">
@@ -326,35 +327,75 @@
           <div id="tab-content-studio" class="tab-pane">
             <div class="studio-layout">
               <!-- 左侧：新建生成器 -->
-              <div class="studio-selector-card glass-card">
+              <div class="studio-selector-card glass-card" data-liquid-glass="panel">
                 <h3>新建智能生成物</h3>
-                <p class="subtitle">基于笔记本中的现有所有文档来源，一键生成不同媒介的总结或交互应用。</p>
+                <p class="subtitle">完整映射 notebooklm-py 0.7.3 的公开生成参数。语言、来源和风格均可按任务独立配置。</p>
                 
                 <div class="artifact-types-grid">
-                  <div class="artifact-type-btn active" data-type="audio">
+                  <button type="button" class="artifact-type-btn active" data-type="audio">
                     <div class="type-avatar">🎙️</div>
-                    <div class="type-name">音频播客 (Podcast)</div>
-                  </div>
-                  <div class="artifact-type-btn" data-type="report">
+                    <div class="type-name">音频概览</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="video">
+                    <div class="type-avatar">🎬</div>
+                    <div class="type-name">视频概览</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="cinematic_video">
+                    <div class="type-avatar">🎞️</div>
+                    <div class="type-name">电影视频</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="report">
                     <div class="type-avatar">📄</div>
-                    <div class="type-name">研究简报 (Report)</div>
-                  </div>
-                  <div class="artifact-type-btn" data-type="quiz">
+                    <div class="type-name">报告</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="quiz">
                     <div class="type-avatar">📝</div>
-                    <div class="type-name">测验试卷 (Quiz)</div>
-                  </div>
-                  <div class="artifact-type-btn" data-type="flashcards">
+                    <div class="type-name">测验</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="flashcards">
                     <div class="type-avatar">🎴</div>
-                    <div class="type-name">互动闪卡 (Flashcards)</div>
-                  </div>
-                  <div class="artifact-type-btn" data-type="mind-map">
-                    <div class="type-avatar">🧠</div>
-                    <div class="type-name">思维导图 (Mindmap)</div>
-                  </div>
-                  <div class="artifact-type-btn" data-type="slide-deck">
+                    <div class="type-name">闪卡</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="infographic">
+                    <div class="type-avatar">🖼️</div>
+                    <div class="type-name">信息图</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="slide_deck">
                     <div class="type-avatar">📊</div>
-                    <div class="type-name">幻灯片 (Slides)</div>
+                    <div class="type-name">幻灯片</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="data_table">
+                    <div class="type-avatar">🧮</div>
+                    <div class="type-name">数据表</div>
+                  </button>
+                  <button type="button" class="artifact-type-btn" data-type="mind_map">
+                    <div class="type-avatar">🧠</div>
+                    <div class="type-name">思维导图</div>
+                  </button>
+                </div>
+
+                <div class="artifact-common-options">
+                  <div class="form-group">
+                    <label for="artifact-language">输出语言</label>
+                    <select id="artifact-language">
+                      <option value="zh_Hans">简体中文</option>
+                      <option value="zh_Hant">繁体中文</option>
+                      <option value="en">English</option>
+                      <option value="ja">日本語</option>
+                      <option value="ko">한국어</option>
+                      <option value="es">Español</option>
+                      <option value="fr">Français</option>
+                      <option value="de">Deutsch</option>
+                    </select>
                   </div>
+                  <fieldset class="source-picker">
+                    <legend>使用的参考来源</legend>
+                    <div class="source-picker-head">
+                      <span id="artifact-source-summary">默认使用全部来源</span>
+                      <button type="button" id="btn-toggle-artifact-sources" class="text-button">选择来源</button>
+                    </div>
+                    <div id="artifact-source-options" class="source-picker-options hidden"></div>
+                  </fieldset>
                 </div>
 
                 <!-- 动态生成物参数配置表单 -->
@@ -363,8 +404,9 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="artifact-instructions">自定义生成指令 (可选)</label>
-                  <textarea id="artifact-instructions" placeholder="输入个性化的生成提示词（例如：播客要求用诙谐的中文对话，或者测试卷只出量子力学基础单选题）" rows="3"></textarea>
+                  <label for="artifact-instructions">内容指令（可选）</label>
+                  <textarea id="artifact-instructions" maxlength="20000" placeholder="说明受众、重点、语气或必须覆盖的内容；留空时使用 NotebookLM 默认策略。" rows="3"></textarea>
+                  <div class="field-hint"><span id="artifact-instructions-count">0</span> / 20,000</div>
                 </div>
 
                 <button id="btn-generate-artifact" class="btn btn-purple btn-block">
@@ -452,17 +494,22 @@
 
   <!-- 3.1 API 配置设置弹窗 -->
   <div id="modal-settings" class="modal-overlay">
-    <div class="modal-card">
+    <div class="modal-card" data-liquid-glass="panel">
       <div class="modal-header">
         <h3>NotebookLM Gateway 配置中心</h3>
         <button class="modal-close icon-btn">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="modal-description">配置您的本地网关 API 端点与 User API Key，这些设置保存在浏览器本地，不会上传第三方服务器。</p>
+        <p class="modal-description">API Key 默认只保留到当前浏览器会话结束；仅在受信任的个人设备上选择长期保存。</p>
         
         <div class="form-group">
           <label for="settings-url">网关服务器地址 (Base URL)</label>
-          <input type="text" id="settings-url" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
+          <input type="url" id="settings-url" placeholder="https://gateway.example.com">
+        </div>
+
+        <div class="form-checkbox">
+          <input type="checkbox" id="settings-remember-key">
+          <label for="settings-remember-key">在此设备长期保存 API Key</label>
         </div>
 
         <div class="form-group">
@@ -572,9 +619,10 @@
           <div class="form-group">
             <label for="source-drive-mimetype">资源 MIME 类型</label>
             <select id="source-drive-mimetype">
-              <option value="google-doc">Google Docs 文档</option>
-              <option value="google-sheet">Google Sheets 表格</option>
-              <option value="pdf">PDF 格式文件</option>
+                      <option value="application/vnd.google-apps.document">Google Docs 文档</option>
+                      <option value="application/vnd.google-apps.spreadsheet">Google Sheets 表格</option>
+                      <option value="application/vnd.google-apps.presentation">Google Slides 演示文稿</option>
+                      <option value="application/pdf">PDF 格式文件</option>
             </select>
           </div>
           <div class="form-group">
@@ -698,6 +746,8 @@
   <!-- 3.7 全局 Toast 提示容器 -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- LiquidGlass 视觉增强独立打包；业务逻辑仍由原生模块维护 -->
+  <script defer src="js/liquid-glass.bundle.js"></script>
   <!-- 引入模块化 JS 入口 -->
   <script type="module" src="js/app.js"></script>
 </body>

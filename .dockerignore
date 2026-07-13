@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+*.db
+.env
+data
+docs
+tests
+**/node_modules
+build
+dist
+*.spec
+gateway_client/settings.json
+gateway_client/temp_profile
+容器日志.md

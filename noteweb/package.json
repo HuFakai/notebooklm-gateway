@@ -1,0 +1,17 @@
+{
+  "name": "notebooklm-noteweb-liquid-glass",
+  "private": true,
+  "version": "0.2.0",
+  "scripts": {
+    "build": "esbuild src/liquid-glass.jsx --bundle --minify --format=iife --target=es2020 --outfile=js/liquid-glass.bundle.js --legal-comments=none",
+    "check": "npm run build && node --check js/liquid-glass.bundle.js"
+  },
+  "dependencies": {
+    "liquid-glass-react": "1.1.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}

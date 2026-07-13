@@ -14,8 +14,8 @@ export function initResearch() {
   // 启动深度研究
   btnStart.addEventListener('click', startDeepResearch);
 
-  // 取消深度研究
-  btnCancel.addEventListener('click', cancelDeepResearch);
+  // 稳定版 notebooklm-py 0.7.3 暂未公开研究取消能力。
+  btnCancel.disabled = true;
 
   // 导入为参考源
   btnImport.addEventListener('click', importResearchToSource);
@@ -80,24 +80,31 @@ async function pollResearchProgress(notebookId, runId) {
       // 渲染 Markdown 格式研究报告
       const reportHtml = window.renderMarkdown(res.report || "深度研究报告生成为空。");
       
-      // 渲染引用来源
-      let referencesHtml = '';
+      reportView.innerHTML = reportHtml;
       if (res.sources && res.sources.length > 0) {
-        referencesHtml = `
-          <div style="margin-top: 2rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem;">
-            <h4>🔍 搜集参考文献资料 (${res.sources.length} 篇)：</h4>
-            <ul style="list-style-type: decimal; margin-left: 1.5rem; margin-top: 0.5rem;">
-              ${res.sources.map(s => `
-                <li style="margin-bottom: 0.4rem;">
-                  <a href="${s.url}" target="_blank" style="color: var(--neon-blue); text-decoration: underline;">${s.title}</a>
-                </li>
-              `).join('')}
-            </ul>
-          </div>
-        `;
+        const references = document.createElement('section');
+        references.className = 'research-references';
+        const heading = document.createElement('h4');
+        heading.textContent = `🔍 搜集参考文献资料（${res.sources.length} 篇）`;
+        const list = document.createElement('ol');
+        res.sources.forEach(source => {
+          const item = document.createElement('li');
+          const link = document.createElement('a');
+          link.textContent = source.title || source.url || '未命名来源';
+          try {
+            const url = new URL(source.url);
+            if (['http:', 'https:'].includes(url.protocol)) {
+              link.href = url.href;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+            }
+          } catch (_) {}
+          item.appendChild(link);
+          list.appendChild(item);
+        });
+        references.append(heading, list);
+        reportView.appendChild(references);
       }
-
-      reportView.innerHTML = reportHtml + referencesHtml;
       
       // 显示导入参考源按钮
       btnImport.classList.remove('hidden');
@@ -117,25 +124,6 @@ async function pollResearchProgress(notebookId, runId) {
   } catch (err) {
     console.error('轮询研究进度出错:', err);
     // 轮询偶发报错不清除定时器，尝试继续
-  }
-}
-
-async function cancelDeepResearch() {
-  if (!currentRunId) return;
-  
-  const notebookId = window.state.currentNotebookId;
-  const statusPanel = document.getElementById('research-status-panel');
-  const btnStart = document.getElementById('btn-start-research');
-
-  try {
-    clearInterval(researchInterval);
-    await window.apiClient.cancelResearch(notebookId, currentRunId);
-    
-    statusPanel.classList.add('hidden');
-    btnStart.removeAttribute('disabled');
-    window.showToast('探索任务已被用户取消');
-  } catch (err) {
-    window.showToast(`取消探索任务失败: ${err.message}`, 'error');
   }
 }
 

@@ -103,7 +103,8 @@ async function loadNotebookGuideDetails(notebookId) {
     
   } catch (err) {
     console.error('获取笔记本详情失败:', err);
-    summaryContainer.innerHTML = `<p style="color:var(--neon-red);">获取指南摘要失败: ${err.message}</p>`;
+    summaryContainer.textContent = `获取指南摘要失败: ${err.message}`;
+    summaryContainer.style.color = 'var(--neon-red)';
     if (suggestionsContainer) {
       suggestionsContainer.innerHTML = '<div class="empty-state" style="padding:1rem; color:var(--neon-red);">加载失败</div>';
     }
@@ -131,9 +132,9 @@ function renderGuideSourcesList() {
       <div class="guide-source-item">
         <div class="guide-source-info">
           <span style="font-size:1.1rem; flex-shrink:0;">${icon}</span>
-          <span class="item-name" style="font-size:0.85rem;" title="${src.title}">${src.title}</span>
+          <span class="item-name" style="font-size:0.85rem;" title="${window.escapeHTML(src.title)}">${window.escapeHTML(src.title)}</span>
         </div>
-        <button class="btn btn-sm btn-primary read-guide-src-btn" data-id="${src.id}" style="padding:0.3rem 0.6rem; font-size:0.75rem;">阅读正文</button>
+        <button class="btn btn-sm btn-primary read-guide-src-btn" data-id="${window.escapeHTML(src.id)}" style="padding:0.3rem 0.6rem; font-size:0.75rem;">阅读正文</button>
       </div>
     `;
   }).join('');
@@ -159,7 +160,8 @@ function renderGuideSourcesList() {
         const text = await window.apiClient.getSourceText(window.state.currentNotebookId, srcId);
         contentDisplay.innerHTML = window.renderMarkdown(text || "该参考源无文本内容。");
       } catch (err) {
-        contentDisplay.innerHTML = `<p style="color:var(--neon-red);">加载失败: ${err.message}</p>`;
+        contentDisplay.textContent = `加载失败: ${err.message}`;
+        contentDisplay.style.color = 'var(--neon-red)';
       }
     });
   });
@@ -172,8 +174,8 @@ function renderSuggestionsFromData(topics) {
   if (topics && topics.length > 0) {
     container.innerHTML = topics.map(t => `
       <div class="guide-suggestion-item" data-prompt="${encodeURIComponent(t.prompt)}">
-        <div style="font-weight:600; color:var(--neon-blue); margin-bottom:0.15rem;">${t.question}</div>
-        <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.prompt}</div>
+        <div style="font-weight:600; color:var(--neon-blue); margin-bottom:0.15rem;">${window.escapeHTML(t.question)}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${window.escapeHTML(t.prompt)}</div>
       </div>
     `).join('');
 

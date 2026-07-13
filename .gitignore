@@ -5,6 +5,8 @@
 temp_profile/
 gateway_client/temp_profile/
 gateway_client/settings.json
+data/.gateway-key
+data/profiles/
 
 # Python 虚拟环境与缓存
 .venv/
@@ -15,6 +17,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+docs/node_modules/
+noteweb/node_modules/
 
 # 数据库文件 (SQLite)
 *.db

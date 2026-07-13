@@ -16,7 +16,7 @@ def build_app():
         import PySide6
     except ImportError:
         print("错误：打包前请先安装依赖包！请执行：")
-        print("pip install PyInstaller PySide6 httpx playwright")
+        print("pip install -e '.[client]' pyinstaller")
         sys.exit(1)
 
     # 构造 PyInstaller 命令行
@@ -27,10 +27,9 @@ def build_app():
         "-F",                    # 单文件打包
         "-w",                    # 无控制台黑框 (GUI 模式)
         "--name=notebooklm-gateway-client",
-        # 极其重要：把 gateway_server 目录整体打包进数据，供客户端加载底层代码
-        f"--add-data=gateway_server{os.pathsep}gateway_server",
         # 收集 Playwright 相关的运行时文件
         "--collect-all=playwright",
+        "--collect-all=notebooklm",
         "gateway_client/app.py"
     ]
     

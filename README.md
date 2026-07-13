@@ -1,159 +1,211 @@
-# NotebookLM Gateway 🚀
+# NotebookLM Gateway
 
-一个独立、自包含、支持**多租户/多账号动态路由**的 Google NotebookLM 外部 API 网关服务。
+基于 `notebooklm-py==0.7.3` 稳定版公开 Python API 的多租户薄网关，内置响应式 NoteWeb、账户管理页和桌面凭据助手。
 
-配有跨平台的桌面助手客户端，实现 Google 一键登录、自动获取主令牌（Master Token）并安全推送到服务器，全程无需配置任何复杂的凭证文件，开箱即用。
+> 本项目使用 NotebookLM 的非官方 SDK，不是 Google 官方产品。上游接口可能变化；生产升级前请先在测试环境验证。
 
----
+## 当前架构
 
-## 🌟 核心特性
+本项目采用“稳定版公开 Python API + 自有薄网关”：仓库不再内嵌或修改 `notebooklm-py` 源码，也不依赖它的私有模块或实验性 Server 实现。
 
-*   **极简部署**：一键 `docker-compose up` 启动，无需手动在容器中安装 Chrome 浏览器（登录环节全部转移到本地桌面端进行，服务器端保持极度轻量）。
-*   **多账号多 Key 路由**：支持托管多个 Google 账号，为每个账号分配独立的 `api_key` 进行分权调用。
-*   **热更新**：通过本地助手同步凭证后，服务端自动热加载会话，无需重启容器。
-*   **自带控制台**：内置高颜值极简 Web 控制台，轻松管理托管账号、复制及修改 API Key。
-*   **Cookie 自动续期**：基于 Master Token 持久主令牌机制，容器在后台自动刷新 Cookie，持久稳定运行。
-
----
-
-## 📦 1. 服务端部署与更新指南 (Ubuntu / 1Panel)
-
-### 第一步：获取代码并一键启动
-在服务器终端中执行：
-
-```bash
-# 克隆代码
-git clone https://github.com/HuFakai/notebooklm-gateway.git
-cd notebooklm-gateway
-
-# 1. 复制配置文件并修改参数
-cp .env.example .env
-
-# 编辑 .env 文件，修改你的 GATEWAY_PORT 和 GATEWAY_ADMIN_TOKEN 管理密码
-nano .env
-
-# 2. 启动 Docker 容器
-docker compose up -d
+```mermaid
+flowchart LR
+  Login["桌面凭据助手<br/>notebooklm login"] -->|"管理员 Bearer Token<br/>上传 storage_state"| Gateway["FastAPI 薄网关"]
+  NoteWeb["NoteWeb / 外部客户端"] -->|"用户 Bearer API Key"| Gateway
+  Admin["管理控制台"] -->|"管理员 Bearer Token"| Gateway
+  Gateway --> DB["加密 SQLite<br/>账户与生成任务"]
+  Gateway --> Pool["有界 SDK 客户端池"]
+  Pool --> SDK["notebooklm-py 0.7.3<br/>仅公开 API"]
+  SDK --> NLM["Google NotebookLM"]
 ```
 
-> [!IMPORTANT]
-> - 容器会默认自动加载项目根目录下的 `.env` 文件。
-> - `GATEWAY_PORT`：代表要映射到宿主机上的访问端口（默认使用 `18388`）。
-> - `GATEWAY_ADMIN_TOKEN`：管理员管理令牌，用于上传凭证和控制台身份登录验证。强烈建议将其修改为一个高强度的随机 Token，且该变量保存在本地 `.env` 中，已被 Git 自动忽略，以保安全。
+这样做的理由和边界见 [架构决策](docs/architecture.md)，旧版本升级步骤见 [迁移指南](docs/migration.md)。
 
-### 第二步：配置反向代理与 HTTPS
-由于 API 调用及凭证上传包含敏感密钥，强烈建议在 1Panel 中将域名（如 `gateway.example.com`）反向代理至 **`http://notebooklm-gateway-server:18388`**（容器局域网直连），并在网站设置中申请一键 SSL 证书以启用 HTTPS 加密。
+## 主要能力
 
-部署完成后，你可以在浏览器直接访问网关控制台：
-`https://你的域名/admin`
+- 笔记本、来源、对话、深度研究、笔记和共享管理。
+- Studio 支持音频、视频、电影视频、报告、测验、闪卡、信息图、幻灯片、数据表、思维导图共 10 类生成物。
+- Studio 映射稳定版 SDK 的语言、来源、格式、长度、风格、难度、方向、详细度和自定义指令参数。
+- 生成任务按账户持久化，服务重启后仍可继续查询；下载时使用明确的 `artifact_id`。
+- SQLite 中的 API Key、Cookie Storage State 和兼容字段使用 Fernet 加密；用户 Key 以 HMAC 索引查找。
+- SDK 客户端池有容量上限、空闲回收、每账户并发初始化锁和 Cookie 变更回写。
+- NoteWeb 支持桌面与移动端、会话级 Key 保存、安全 DOM 渲染和音视频、图片、PDF、文本、JSON 预览。
+- NoteWeb 使用 `liquid-glass-react` 1.1.1 渐进增强关键界面；不支持 SVG 位移的浏览器自动保留 CSS 玻璃回退。
 
-第一次进入控制台需要输入在 `.env` 中设置的 **`GATEWAY_ADMIN_TOKEN`** 管理密码进行安全登录，登录成功后方可查看和管理各个托管账号的凭证和 Key。
+## 快速部署
 
-### 第三步：服务端版本平滑更新
-当本网关项目发布了新版本（或您更新了 GitHub 仓库源码），可以通过以下几步在服务器上一键平滑更新部署：
+要求 Docker Compose，或 Python 3.11–3.14。
+
+### Docker Compose
 
 ```bash
-# 1. 进入网关目录
-cd notebooklm-gateway
-
-# 2. 停止并删除旧容器
-docker compose down
-
-# 3. 拉取最新代码 (会保留您的本地 .env 配置文件)
-git pull origin main
-
-# 4. 重新构建 Docker 镜像并后台启动运行
+cp .env.example .env
+python -c 'import secrets; print(secrets.token_urlsafe(48))'
+# 将输出写入 .env 的 GATEWAY_ADMIN_TOKEN
 docker compose up -d --build
 ```
 
----
+启动后访问：
 
-## 🖥️ 2. 本地助手客户端使用指南 (Mac & Win)
+- NoteWeb：`http://localhost:18388/noteweb/`
+- 管理控制台：`http://localhost:18388/admin`
+- OpenAPI：`http://localhost:18388/docs`
+- 健康检查：`http://localhost:18388/healthz`
 
-本地助手 `notebooklm-gateway-client` 负责协助你在本地安全登录 Google，提取凭证并同步至远端服务器。
+`GATEWAY_ADMIN_TOKEN` 必须至少 32 字节；示例占位值和旧版默认值会被拒绝。`data/` 必须持久化，其中 `gateway.db` 和 `.gateway-key` 缺一不可。
 
-### 如何运行客户端
+### 本地运行
+
 ```bash
-# 1. 如果本地尚未创建 Python 虚拟环境，请先创建：
 python -m venv .venv
-
-# 2. 激活项目本地的虚拟环境
-# macOS / Linux:
 source .venv/bin/activate
-# Windows (cmd):
-# .venv\Scripts\activate.bat
-# Windows (PowerShell):
-# .venv\Scripts\Activate.ps1
+pip install -e .
+export GATEWAY_ADMIN_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+uvicorn gateway_server.main:app --host 0.0.0.0 --port 18388
+```
 
-# 3. 安装客户端所必须的依赖项与浏览器驱动
-pip install PySide6 playwright httpx pyinstaller
-playwright install chrome
+生产环境可使用经过验证的精确依赖：
 
-# 4. 启动本地助手
+```bash
+pip install -r requirements.lock
+pip install --no-deps .
+```
+
+## 添加 NotebookLM 账户
+
+推荐使用桌面凭据助手。它调用 `notebooklm-py` 文档化的 `notebooklm login` 流程，并只向网关上传生成的 `storage_state.json`。
+
+```bash
+python -m venv .venv-client
+source .venv-client/bin/activate
+pip install -e '.[client]'
 python gateway_client/app.py
 ```
 
-### 编译打包为独立软件
-在将本地助手编译打包为独立软件前，**请确保您已执行上述“如何运行客户端”中的第一步，在本地 Python 虚拟环境中成功安装了所有依赖项**。
+在助手中填写：
 
-在您的电脑终端直接执行打包脚本，打包完成后会在 `dist/` 目录下生成可以直接双击运行的桌面软件：
+1. 网关地址，例如 `https://gateway.example.com`。
+2. `GATEWAY_ADMIN_TOKEN`。
+3. 账户邮箱，以及为该账户生成的独立用户 API Key（至少 16 字符）。
+4. 点击浏览器登录，在系统 Chrome 中完成 Google/NotebookLM 登录后返回助手上传。
+
+也可手动调用管理接口：
+
 ```bash
-python gateway_client/build.py
+curl -X POST http://localhost:18388/v1/auth/credentials \
+  -H "Authorization: Bearer $GATEWAY_ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d @- <<'JSON'
+{
+  "email": "user@example.com",
+  "api_key": "replace-with-a-unique-user-key",
+  "storage_state": "{\"cookies\":[],\"origins\":[]}"
+}
+JSON
 ```
 
-### 使用步骤：
-1. 打开助手，输入你的【远程网关 API 地址】和【管理员 Token】。
-2. 输入你的当前 Google 账号邮箱，并自定义本账号调用 API 的 `api_key`。
-3. 点击 **【🔑 登录 Google 获取凭据】**，在弹出的窗口中登录 Google 账号。
-4. 登录完成并跳转至 NotebookLM 页面后，系统会自动拦截凭证。
-5. 点击 **【🚀 一键同步到服务器】**，凭证即刻同步到你的云端数据库并实时生效。
-6. 点击 **【🔍 联通性测试】**，即可验证网关是否打通！
+`storage_state` 是 JSON 字符串，并且必须包含 `cookies` 数组。真实凭据应由登录工具产生，不要使用上面的空 Cookie 示例访问 NotebookLM。
 
----
+## 认证模型
 
-## 🔑 3. 外部 API 调用说明
+系统严格分离两类 Bearer Token：
 
-有关本网关服务所支持的所有管理与业务 API 接口的参数规范、请求与响应示例，请参阅：
-👉 **[API 接口介绍文档 (API.md)](file:///Users/fakaihu/Documents/project/notebooklm/API.md)**
+- 管理 Token：仅用于 `/v1/auth/credentials` 和 `/admin/api/*`。不能调用笔记本业务 API。
+- 用户 API Key：绑定一个 NotebookLM 账户，仅用于 `/v1/server/info` 和 `/v1/notebooks/*`。不能调用管理接口。
 
-网关完全兼容 `notebooklm-py` 的所有路由规格。你只需要在请求 Header 中携带：
-`Authorization: Bearer <你为该账号分配的 api_key>`
-
-### 示例 1：获取对应账号的笔记本列表 (Curl)
 ```bash
-curl -X GET "https://gateway.example.com/v1/notebooks" \
-     -H "Authorization: Bearer my_custom_api_key_123"
+curl http://localhost:18388/v1/notebooks \
+  -H "Authorization: Bearer $USER_API_KEY"
 ```
 
-### 示例 2：使用 Python 客户端与特定账号进行对话
-```python
-import httpx
+管理页将 Token 保存在 `sessionStorage`；NoteWeb 默认也只在当前会话保存用户 Key，只有用户主动勾选后才写入 `localStorage`。
 
-url = "https://gateway.example.com/v1/notebooks/YOUR_NOTEBOOK_ID/chat"
-headers = {
-    "Authorization": "Bearer my_custom_api_key_123", # 对应账号的 key
-    "Content-Type": "application/json"
-}
-payload = {
-    "question": "请帮我总结一下这本笔记本的核心内容"
-}
+## Studio 示例
 
-with httpx.Client() as client:
-    response = client.post(url, json=payload, headers=headers, timeout=60.0)
-    print(response.json())
+```bash
+curl -X POST http://localhost:18388/v1/notebooks/NOTEBOOK_ID/artifacts \
+  -H "Authorization: Bearer $USER_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "type": "infographic",
+    "source_ids": ["SOURCE_ID"],
+    "language": "zh_Hans",
+    "instructions": "面向管理层，突出三项关键结论",
+    "orientation": "landscape",
+    "detail_level": "detailed",
+    "infographic_style": "professional"
+  }'
 ```
 
----
+创建接口返回 `task_id` 后，使用同一账户和笔记本轮询：
 
-## 💖 鸣谢与参考
+```bash
+curl http://localhost:18388/v1/notebooks/NOTEBOOK_ID/artifacts/TASK_ID \
+  -H "Authorization: Bearer $USER_API_KEY"
+```
 
-本项目在开发过程中，深受以下开源项目的启发与核心能力支持，在此表示诚挚的感谢：
+完整参数、下载格式和路由见 [API 文档](API.md)。
 
-1.  **[teng-lin / notebooklm-py](https://github.com/teng-lin/notebooklm-py)**：提供了 Google NotebookLM 底层协议和凭据加载的核心提取引擎。
-2.  **[gnh1201 / notebooklm-rest-api](https://github.com/gnh1201/notebooklm-rest-api)**：提供了轻量化部署与多账号 API 集中网关的架构设计灵感。
+## 配置
 
----
+| 环境变量 | 默认值 | 说明 |
+| --- | ---: | --- |
+| `GATEWAY_ADMIN_TOKEN` | 无 | 必填，至少 32 字节 |
+| `GATEWAY_DATA_DIR` | `data` | 数据库、密钥和 SDK Profile 目录 |
+| `GATEWAY_ENCRYPTION_KEY` | 自动生成 | 可选 Fernet Key；设置后必须稳定持久化 |
+| `GATEWAY_CORS_ORIGINS` | 空 | 逗号分隔的允许 Origin；同域部署留空 |
+| `GATEWAY_MAX_CLIENTS` | `20` | SDK 客户端池上限 |
+| `GATEWAY_CLIENT_IDLE_SECONDS` | `1800` | 空闲回收秒数 |
+| `GATEWAY_KEEPALIVE_SECONDS` | `600` | SDK 会话保活周期 |
+| `GATEWAY_MAX_UPLOAD_BYTES` | `104857600` | 单文件上传上限 |
+| `GATEWAY_PORT` | `18388` | Compose 对外映射端口 |
 
-## 📄 开源协议
+## 安全与运维
 
-本项目基于 **MIT License** 协议开源。您可以自由地使用、修改和分发本项目代码，但请保留原作者的版权声明及开源协议。
+- 请通过 HTTPS 反向代理公开服务；不要把管理页和管理 Token 暴露给不可信网络。
+- 不要提交 `.env`、`data/`、`gateway_client/settings.json` 或任何 `storage_state.json`。
+- 整体备份 `data/`。丢失 `.gateway-key`（或配置的 `GATEWAY_ENCRYPTION_KEY`）后，数据库中的凭据无法恢复。
+- CORS 默认关闭；仅在前后端分离部署时设置精确 HTTPS Origin，避免使用通配符。
+- NotebookLM 身份失效时账户会标记为 `expired`；重新使用桌面助手登录并上传即可恢复为 `active`。
+- 本项目不记录 Google 密码；浏览器登录发生在 Google/NotebookLM 页面。
+
+## 已知边界
+
+- `notebooklm-py 0.7.3` 的公开 API 没有研究任务取消能力，因此取消路由明确返回 `501`，NoteWeb 中相应按钮禁用。
+- 稳定版公开 API 没有 master-token 自动引导接口；凭据续期依赖文档化的浏览器登录和 Cookie 回写。
+- 生成物“查看参数/重试”只适用于经本网关创建并有持久化任务记录的生成物。
+- 上游是非官方接口；速率限制、生成能力和返回结构仍可能由 NotebookLM 调整。
+
+## 开发与验证
+
+```bash
+pip install -e '.[test]'
+pytest -q
+python -m compileall -q gateway_server gateway_client tests
+for file in noteweb/js/*.js noteweb/js/components/*.js; do node --check "$file"; done
+
+# 重建 LiquidGlass 视觉增强 bundle
+cd noteweb
+npm ci
+npm run check
+cd ..
+
+# 对运行中的实例执行只读冒烟测试
+GATEWAY_USER_API_KEY=... python test_api_connection.py
+
+cd docs
+npm ci
+npm run docs:build
+```
+
+## 文档
+
+- [REST API](API.md)
+- [架构决策](docs/architecture.md)
+- [旧版迁移指南](docs/migration.md)
+- [在线文档站源码](docs/index.md)
+- 运行中的交互式 OpenAPI：`/docs`
+
+## License
+
+MIT。NoteWeb 第三方组件许可见 [THIRD_PARTY_NOTICES.md](noteweb/THIRD_PARTY_NOTICES.md)。

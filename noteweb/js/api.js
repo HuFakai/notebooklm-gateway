@@ -1,10 +1,10 @@
 /**
  * NoteWeb - NotebookLM Gateway API Client
- * 封装与网关后端交互的所有 HTTP 请求与 SSE 流解析逻辑
+ * 封装与网关后端交互的 HTTP 请求，并为普通 JSON 对话响应提供渐显回调
  */
 
 export class APIClient {
-  constructor(baseURL = 'http://127.0.0.1:8000', apiKey = '') {
+  constructor(baseURL = window.location.origin, apiKey = '') {
     this.baseURL = this.sanitizeURL(baseURL);
     this.apiKey = apiKey;
   }
@@ -162,7 +162,12 @@ export class APIClient {
   // ==========================================
   async configureChat(notebookId, chatMode = 'default', goal = null, responseLength = 'default') {
     const payload = chatMode === 'custom' 
-      ? { chat_mode: null, goal, response_length: responseLength }
+      ? {
+          chat_mode: null,
+          goal: 'custom',
+          custom_prompt: goal,
+          response_length: responseLength === 'short' ? 'shorter' : responseLength === 'long' ? 'longer' : 'default'
+        }
       : { chat_mode: chatMode };
     return this.request('POST', `/v1/notebooks/${notebookId}/chat/configure`, payload);
   }
@@ -272,45 +277,11 @@ export class APIClient {
   // ==========================================
   async listArtifacts(notebookId) {
     const res = await this.request('GET', `/v1/notebooks/${notebookId}/artifacts`);
-    const rawList = res.artifacts || [];
-    
-    // 归一化处理，将后端的整型 status 和 _artifact_type 转换为前端可读的字符串，并补充 type 字段
-    return rawList.map(art => {
-      // 1. 状态转换
-      let statusStr = 'completed';
-      if (art.status === 1) statusStr = 'in_progress';
-      else if (art.status === 2) statusStr = 'pending';
-      else if (art.status === 3) statusStr = 'completed';
-      else if (art.status === 4) statusStr = 'failed';
-      
-      // 2. 类型转换
-      let typeStr = 'report';
-      const typeCode = art._artifact_type;
-      const variant = art._variant;
-      
-      if (typeCode === 1) typeStr = 'audio';
-      else if (typeCode === 2) typeStr = 'report';
-      else if (typeCode === 3) typeStr = 'video';
-      else if (typeCode === 4) {
-        if (variant === 1 || (art.title && art.title.includes('闪卡'))) {
-          typeStr = 'flashcards';
-        } else if (variant === 4) {
-          typeStr = 'mind-map';
-        } else {
-          typeStr = 'quiz';
-        }
-      }
-      else if (typeCode === 5) typeStr = 'mind-map';
-      else if (typeCode === 7) typeStr = 'infographic';
-      else if (typeCode === 8) typeStr = 'slide-deck';
-      else if (typeCode === 9) typeStr = 'data-table';
-      
-      return {
-        ...art,
-        type: typeStr,
-        status: statusStr
-      };
-    });
+    return (res.artifacts || []).map(artifact => ({
+      ...artifact,
+      status: String(artifact.status || 'completed').toLowerCase(),
+      type: String(artifact.type || 'unknown').replaceAll('-', '_')
+    }));
   }
 
   async createArtifact(notebookId, payload) {
@@ -318,22 +289,8 @@ export class APIClient {
   }
 
   async getArtifactStatus(notebookId, taskId) {
-    const res = await this.request('GET', `/v1/notebooks/${notebookId}/artifacts/${taskId}`);
-    
-    // 兼容可能为整型的 status
-    let statusStr = res.status;
-    if (statusStr === 1) statusStr = 'in_progress';
-    else if (statusStr === 2) statusStr = 'pending';
-    else if (statusStr === 3) statusStr = 'completed';
-    else if (statusStr === 4) statusStr = 'failed';
-    
-    if (typeof statusStr === 'string') {
-      statusStr = statusStr.toLowerCase();
-    }
-    return {
-      ...res,
-      status: statusStr
-    };
+    const result = await this.request('GET', `/v1/notebooks/${notebookId}/artifacts/${taskId}`);
+    return { ...result, status: String(result.status || '').toLowerCase() };
   }
 
   async getArtifactPrompt(notebookId, artifactId) {
@@ -355,7 +312,7 @@ export class APIClient {
   /**
    * 下载二进制媒体文件 (返回 Blob 对象)
    */
-  async downloadArtifact(notebookId, type) {
+  async downloadArtifact(notebookId, type, artifactId, outputFormat = null) {
     const url = `${this.baseURL}/v1/notebooks/${notebookId}/artifacts/download`;
     const response = await fetch(url, {
       method: 'POST',
@@ -363,11 +320,13 @@ export class APIClient {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ type })
+      body: JSON.stringify({ type, artifact_id: artifactId, output_format: outputFormat })
     });
 
     if (!response.ok) {
-      throw new Error(`媒体下载失败: ${response.status}`);
+      let detail = `媒体下载失败: ${response.status}`;
+      try { detail = (await response.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
     }
 
     return await response.blob();
@@ -381,7 +340,7 @@ export class APIClient {
   }
 
   async togglePublicShare(notebookId, enable) {
-    return this.request('POST', `/v1/notebooks/${notebookId}/share/public`, { enable });
+    return this.request('POST', `/v1/notebooks/${notebookId}/share/public`, { public: enable });
   }
 
   async addCollaborator(notebookId, email, permission = 'viewer', notify = false) {
@@ -389,10 +348,10 @@ export class APIClient {
   }
 
   async updateCollaborator(notebookId, email, permission) {
-    return this.request('PATCH', `/v1/notebooks/${notebookId}/share/users/${email}`, { permission });
+    return this.request('PATCH', `/v1/notebooks/${notebookId}/share/users/${encodeURIComponent(email)}`, { permission });
   }
 
   async removeCollaborator(notebookId, email) {
-    return this.request('DELETE', `/v1/notebooks/${notebookId}/share/users/${email}`);
+    return this.request('DELETE', `/v1/notebooks/${notebookId}/share/users/${encodeURIComponent(email)}`);
   }
 }

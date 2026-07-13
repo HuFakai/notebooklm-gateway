@@ -16,7 +16,8 @@ export function initShare() {
     const enable = publicToggle.checked;
     try {
       const res = await window.apiClient.togglePublicShare(notebookId, enable);
-      window.state.publicAccess = res.public_access;
+      window.state.publicAccess = Boolean(res.is_public);
+      window.state.publicShareUrl = res.share_url || '';
       renderPublicLink(notebookId);
       window.showToast(enable ? '公开共享链接已开启' : '公开共享链接已关闭');
     } catch (err) {
@@ -71,8 +72,9 @@ export async function renderShareTab() {
     const shareInfo = await window.apiClient.getShareStatus(notebookId);
     
     // 更新公开链接开关状态
-    window.state.publicAccess = shareInfo.public_access;
-    const isPublic = shareInfo.public_access === 'enabled';
+    window.state.publicAccess = Boolean(shareInfo.is_public);
+    window.state.publicShareUrl = shareInfo.share_url || '';
+    const isPublic = window.state.publicAccess;
     publicToggle.checked = isPublic;
     
     renderPublicLink(notebookId);
@@ -96,15 +98,15 @@ export async function renderShareTab() {
 
       return `
         <tr>
-          <td class="collab-email">${user.email}</td>
+          <td class="collab-email">${window.escapeHTML(user.email)}</td>
           <td>
-            <select class="collab-select" data-email="${user.email}">
+            <select class="collab-select" data-email="${window.escapeHTML(user.email)}">
               <option value="viewer" ${isViewer}>查看者 (Viewer)</option>
               <option value="editor" ${isEditor}>编辑者 (Editor)</option>
             </select>
           </td>
           <td style="text-align: center;">
-            <button class="icon-btn danger delete-collab-btn" data-email="${user.email}" title="移除协作者">
+            <button class="icon-btn danger delete-collab-btn" data-email="${window.escapeHTML(user.email)}" title="移除协作者">
               <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -150,23 +152,26 @@ export async function renderShareTab() {
 
   } catch (err) {
     console.error('获取共享状态失败:', err);
-    collabList.innerHTML = `
-      <tr>
-        <td colspan="3" class="table-empty" style="color:var(--neon-red);">获取共享列表失败: ${err.message}</td>
-      </tr>
-    `;
+    collabList.replaceChildren();
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 3;
+    cell.className = 'table-empty';
+    cell.style.color = 'var(--neon-red)';
+    cell.textContent = `获取共享列表失败: ${err.message}`;
+    row.appendChild(cell);
+    collabList.appendChild(row);
   }
 }
 
 function renderPublicLink(notebookId) {
   const container = document.getElementById('public-link-container');
   const linkInput = document.getElementById('public-share-link');
-  const isPublic = window.state.publicAccess === 'enabled';
+  const isPublic = Boolean(window.state.publicAccess);
 
   if (isPublic) {
     container.classList.remove('hidden');
-    // 构建以网关为域名的直接公开访问接口
-    linkInput.value = `${window.apiClient.baseURL}/v1/notebooks/${notebookId}`;
+    linkInput.value = window.state.publicShareUrl || `https://notebooklm.google.com/notebook/${encodeURIComponent(notebookId)}`;
   } else {
     container.classList.add('hidden');
     linkInput.value = '';

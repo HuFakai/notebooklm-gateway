@@ -1,232 +1,199 @@
-import os
+from __future__ import annotations
+
+import asyncio
+import hmac
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
-from pydantic import BaseModel, EmailStr
-from fastapi import FastAPI, Request, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from typing import Annotated, AsyncIterator
 
-# 引入数据库和核心应用工厂
-from gateway_server.database import DatabaseManager
-from gateway_server.notebooklm.server.app import create_app
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-
-# 1. 继承原版核心应用，获得所有的 /v1 业务路由
-app = create_app()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from notebooklm import (
+    AuthError,
+    NetworkError,
+    NotebookLMError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+    WaitTimeoutError,
 )
 
-@app.middleware("http")
-async def add_pna_header(request: Request, call_next):
-    response = await call_next(request)
-    if "Access-Control-Request-Private-Network" in request.headers:
-        response.headers["Access-Control-Allow-Private-Network"] = "true"
-    return response
+from .api import create_api_router
+from .client_manager import ClientManager
+from .config import Settings
+from .database import DatabaseManager
+from .schemas import CredentialsUpload, KeyUpdate, StatusUpdate
 
-db = DatabaseManager()
-
-# 获取全局 Admin Token 用于上传和管理页面鉴权
-ADMIN_TOKEN = os.environ.get("NOTEBOOKLM_ADMIN_TOKEN", "admin_secret_token_change_me")
-
-class CredentialsUpload(BaseModel):
-    email: EmailStr
-    api_key: str
-    master_token: str
-    storage_state: str
-
-class StatusUpdateRequest(BaseModel):
-    status: str
-
-class KeyUpdateRequest(BaseModel):
-    api_key: str
+ROOT = Path(__file__).resolve().parents[1]
 
 
-def verify_admin_token(request: Request):
-    """管理员鉴权依赖"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        # 补充：也支持从 query parameter 或 X-Admin-Token 获取，方便页面交互
-        token = request.headers.get("X-Admin-Token") or request.query_params.get("admin_token")
-    else:
-        token = auth_header.split(" ")[1]
+async def require_admin(request: Request) -> None:
+    auth = request.headers.get("Authorization", "")
+    scheme, _, token = auth.partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(
+        token, request.app.state.settings.admin_token
+    ):
+        raise HTTPException(401, "Invalid admin token")
 
-    if token != ADMIN_TOKEN:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Admin Token"
-        )
-    return token
 
-# =====================================================================
-# 核心路由 1：桌面客户端一键上传同步凭证
-# =====================================================================
-@app.post("/v1/auth/credentials", tags=["Auth"])
-async def upload_credentials(data: CredentialsUpload, _ = Depends(verify_admin_token)):
-    """供本地客户端同步多账号凭证的接口"""
-    # 检查 storage_state 格式
-    try:
-        json.loads(data.storage_state)
-    except Exception:
-        raise HTTPException(status_code=400, detail="storage_state must be a valid JSON string")
+AdminDep = Annotated[None, Depends(require_admin)]
 
-    # 检查 api_key 是否已被其他账号占用
-    with db._get_connection() as conn:
-        row = conn.execute(
-            "SELECT email FROM accounts WHERE api_key = ?", 
-            (data.api_key,)
-        ).fetchone()
-        if row and row["email"] != data.email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail=f"The API Key is already occupied by another account ({row['email']}). Please choose a different key."
-            )
 
-    # 保存/覆盖到 SQLite 中
-    success = db.save_account(
-        email=data.email,
-        api_key=data.api_key,
-        master_token=data.master_token,
-        storage_state=data.storage_state
+def create_app(settings: Settings | None = None, db: DatabaseManager | None = None) -> FastAPI:
+    resolved = settings or Settings.from_env()
+    database = db or DatabaseManager(resolved.data_dir)
+    manager = ClientManager(
+        database,
+        resolved.data_dir / "profiles",
+        max_clients=resolved.max_clients,
+        idle_seconds=resolved.client_idle_seconds,
+        keepalive_seconds=resolved.keepalive_seconds,
     )
-    
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to save credentials to database")
-        
-    # 清理该 api_key 可能已经缓存的旧客户端连接，实现热更新
-    if hasattr(app.state, "client_pool"):
-        if data.api_key in app.state.client_pool:
-            try:
-                # 尝试安全地关闭旧会话
-                await app.state.client_pool[data.api_key].close()
-            except Exception:
-                pass
-            del app.state.client_pool[data.api_key]
-            
-    return {"ok": True, "message": f"Credentials for {data.email} uploaded and updated successfully."}
 
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        yield
+        await manager.close()
 
-# =====================================================================
-# 核心路由 2：管理后台的 API 接口
-# =====================================================================
-@app.get("/admin/api/accounts", tags=["Admin"])
-async def list_accounts(_ = Depends(verify_admin_token)):
-    """获取系统所有托管账号列表"""
-    accounts = db.get_all_accounts()
-    return {"ok": True, "accounts": accounts}
+    application = FastAPI(
+        title="NotebookLM Gateway",
+        version="0.2.0",
+        description="Multi-tenant thin gateway backed by the public notebooklm-py API.",
+        lifespan=lifespan,
+    )
+    application.state.settings = resolved
+    application.state.db = database
+    application.state.clients = manager
 
-
-@app.delete("/admin/api/accounts/{account_id}", tags=["Admin"])
-async def delete_account(account_id: int, _ = Depends(verify_admin_token)):
-    """删除账号并清除对应客户端缓存"""
-    # 先查出账号对应的 api_key 方便删缓存
-    with db._get_connection() as conn:
-        row = conn.execute("SELECT api_key FROM accounts WHERE id = ?", (account_id,)).fetchone()
-        
-    if row:
-        api_key = row["api_key"]
-        if hasattr(app.state, "client_pool") and api_key in app.state.client_pool:
-            try:
-                await app.state.client_pool[api_key].close()
-            except Exception:
-                pass
-            del app.state.client_pool[api_key]
-
-    success = db.delete_account_by_id(account_id)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to delete account")
-        
-    return {"ok": True, "message": "Account deleted successfully."}
-
-
-@app.put("/admin/api/accounts/{account_id}/status", tags=["Admin"])
-async def update_account_status_api(account_id: int, data: StatusUpdateRequest, _ = Depends(verify_admin_token)):
-    """更新账号会话状态（支持 active / expired 等）"""
-    with db._get_connection() as conn:
-        row = conn.execute("SELECT email FROM accounts WHERE id = ?", (account_id,)).fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Account not found")
-    
-    email = row["email"]
-    success = db.update_account_status(email, data.status)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to update account status")
-    
-    return {"ok": True, "message": f"Account status updated to {data.status}."}
-
-
-@app.put("/admin/api/accounts/{account_id}/key", tags=["Admin"])
-async def update_account_key_api(account_id: int, data: KeyUpdateRequest, _ = Depends(verify_admin_token)):
-    """更新账号外部调用 API Key"""
-    with db._get_connection() as conn:
-        row = conn.execute("SELECT email, api_key FROM accounts WHERE id = ?", (account_id,)).fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Account not found")
-        
-    email = row["email"]
-    old_key = row["api_key"]
-    new_key = data.api_key.strip()
-    if not new_key:
-        raise HTTPException(status_code=400, detail="API Key cannot be empty")
-        
-    with db._get_connection() as conn:
-        dup = conn.execute("SELECT email FROM accounts WHERE api_key = ? AND id != ?", (new_key, account_id)).fetchone()
-        if dup:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"The API Key is already occupied by another account ({dup['email']}). Please choose a different key."
-            )
-
-    try:
-        with db._get_connection() as conn:
-            conn.execute("UPDATE accounts SET api_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_key, account_id))
-            conn.commit()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update API Key: {e}")
-
-    if hasattr(app.state, "client_pool"):
-        if old_key in app.state.client_pool:
-            try:
-                await app.state.client_pool[old_key].close()
-            except Exception:
-                pass
-            del app.state.client_pool[old_key]
-        if new_key in app.state.client_pool:
-            try:
-                await app.state.client_pool[new_key].close()
-            except Exception:
-                pass
-            del app.state.client_pool[new_key]
-
-    return {"ok": True, "message": "API Key updated successfully."}
-
-
-# =====================================================================
-# 核心路由 3：精致的 Web 管理后台单文件返回
-# =====================================================================
-@app.get("/admin", response_class=HTMLResponse, tags=["Admin"])
-async def admin_page():
-    """返回极具现代感的网关管理后台单页"""
-    template_path = Path(__file__).parent / "admin.html"
-    if not template_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Admin console template not found"
+    if resolved.cors_origins:
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(resolved.cors_origins),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type"],
         )
-    with open(template_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+
+    @application.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if request.url.path.startswith(("/admin", "/noteweb")):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @application.exception_handler(NotebookLMError)
+    async def notebooklm_error(_: Request, exc: NotebookLMError) -> JSONResponse:
+        if isinstance(exc, AuthError):
+            code = 401
+        elif isinstance(exc, NotFoundError):
+            code = 404
+        elif isinstance(exc, ValidationError):
+            code = 400
+        elif isinstance(exc, RateLimitError):
+            code = 429
+        elif isinstance(exc, WaitTimeoutError):
+            code = 504
+        elif isinstance(exc, NetworkError):
+            code = 502
+        else:
+            code = 502
+        return JSONResponse(status_code=code, content={"detail": str(exc), "upstream": True})
+
+    @application.get("/healthz", include_in_schema=False)
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @application.post("/v1/auth/credentials", tags=["Auth"])
+    async def upload_credentials(
+        body: CredentialsUpload, _: AdminDep
+    ) -> dict[str, str | bool | int]:
+        try:
+            storage_state = json.loads(body.storage_state)
+            if not isinstance(storage_state, dict) or not isinstance(
+                storage_state.get("cookies"), list
+            ):
+                raise ValueError("storage_state must contain a cookies array")
+            account = await asyncio.to_thread(
+                database.save_account,
+                str(body.email),
+                body.api_key,
+                body.storage_state,
+                body.master_token,
+                body.android_id,
+            )
+        except json.JSONDecodeError as exc:
+            raise HTTPException(400, "storage_state must be valid JSON") from exc
+        except ValueError as exc:
+            status = 400 if str(exc).startswith("storage_state") else 409
+            raise HTTPException(status, str(exc)) from exc
+        await manager.invalidate(account.id)
+        return {"ok": True, "account_id": account.id, "message": "Credentials updated"}
+
+    @application.get("/admin/api/accounts", tags=["Admin"])
+    async def list_accounts(_: AdminDep) -> dict[str, object]:
+        return {"ok": True, "accounts": await asyncio.to_thread(database.get_all_accounts)}
+
+    @application.delete("/admin/api/accounts/{account_id}", tags=["Admin"])
+    async def delete_account(account_id: int, _: AdminDep) -> dict[str, object]:
+        await manager.invalidate(account_id)
+        deleted = await asyncio.to_thread(database.delete_account_by_id, account_id)
+        if not deleted:
+            raise HTTPException(404, "Account not found")
+        return {"ok": True}
+
+    @application.put("/admin/api/accounts/{account_id}/status", tags=["Admin"])
+    async def update_status(
+        account_id: int, body: StatusUpdate, _: AdminDep
+    ) -> dict[str, object]:
+        updated = await asyncio.to_thread(database.update_account_status, account_id, body.status)
+        if not updated:
+            raise HTTPException(404, "Account not found")
+        if body.status != "active":
+            await manager.invalidate(account_id)
+        return {"ok": True, "status": body.status}
+
+    @application.put("/admin/api/accounts/{account_id}/key", tags=["Admin"])
+    async def update_key(
+        account_id: int, body: KeyUpdate, _: AdminDep
+    ) -> dict[str, object]:
+        api_key = body.api_key.strip()
+        if any(char.isspace() for char in api_key):
+            raise HTTPException(400, "API key cannot contain whitespace")
+        try:
+            _, account = await asyncio.to_thread(database.update_account_key, account_id, api_key)
+        except KeyError as exc:
+            raise HTTPException(404, "Account not found") from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        await manager.invalidate(account.id)
+        return {"ok": True}
+
+    application.include_router(create_api_router())
+
+    @application.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+    async def admin_page() -> HTMLResponse:
+        path = Path(__file__).with_name("admin.html")
+        if not path.exists():
+            raise HTTPException(404, "Admin console not found")
+        return HTMLResponse(path.read_text("utf-8"))
+
+    packaged_noteweb = Path(__file__).with_name("noteweb")
+    noteweb = packaged_noteweb if packaged_noteweb.exists() else ROOT / "noteweb"
+    if noteweb.exists():
+        application.mount("/noteweb", StaticFiles(directory=noteweb, html=True), name="noteweb")
+
+    @application.get("/", include_in_schema=False)
+    async def root() -> RedirectResponse:
+        return RedirectResponse("/noteweb/")
+
+    return application
 
 
-# =====================================================================
-# 核心路由 4：挂载前端笔记控制台静态目录 (NoteWeb)
-# =====================================================================
-noteweb_path = Path(__file__).parent.parent / "noteweb"
-if noteweb_path.exists():
-    app.mount("/noteweb", StaticFiles(directory=str(noteweb_path), html=True), name="noteweb")
-
-
+app = create_app()

@@ -1,36 +1,28 @@
-FROM python:3.11-slim
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# 安装服务器依赖 (无需 Playwright 浏览器，极度轻量级)
-RUN pip install --no-cache-dir \
-    fastapi \
-    "uvicorn[standard]" \
-    httpx \
-    python-multipart \
-    pydantic \
-    email-validator \
-    beautifulsoup4 \
-    click \
-    vcrpy \
-    python-dotenv \
-    filelock \
-    gpsoauth \
-    pycryptodomex \
-    rich \
-    requests \
-    -i https://pypi.tuna.tsinghua.edu.cn/simple \
-    --trusted-host pypi.tuna.tsinghua.edu.cn
+RUN addgroup --system gateway && adduser --system --ingroup gateway gateway
 
-# 将服务端代码拷贝进容器
+COPY pyproject.toml requirements.lock /app/
 COPY gateway_server /app/gateway_server
-COPY noteweb /app/noteweb
+COPY gateway_client /app/gateway_client
+COPY noteweb/index.html noteweb/THIRD_PARTY_NOTICES.md /app/noteweb/
+COPY noteweb/css /app/noteweb/css
+COPY noteweb/js /app/noteweb/js
+RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 
-# 容器数据卷挂载点 (用于 SQLite 数据库和凭据缓存存放)
+RUN mkdir -p /app/data && chown -R gateway:gateway /app
+
+USER gateway
 VOLUME /app/data
-
-# 暴露非标准端口
 EXPOSE 18388
 
-# 启动 uvicorn
-CMD ["uvicorn", "gateway_server.main:app", "--host", "0.0.0.0", "--port", "18388"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18388/healthz', timeout=3)"
+
+CMD ["uvicorn", "gateway_server.main:app", "--host", "0.0.0.0", "--port", "18388", "--proxy-headers", "--forwarded-allow-ips=*"]

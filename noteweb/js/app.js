@@ -23,7 +23,8 @@ window.state = {
   notes: [],
   artifacts: [],
   collaborators: [],
-  publicAccess: 'disabled',
+  publicAccess: false,
+  publicShareUrl: '',
   summaryCache: {}
 };
 
@@ -40,7 +41,11 @@ window.showToast = function(message, type = 'success') {
   if (type === 'error') icon = '❌';
   if (type === 'warning') icon = '⚠️';
 
-  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  const iconNode = document.createElement('span');
+  const messageNode = document.createElement('span');
+  iconNode.textContent = icon;
+  messageNode.textContent = String(message);
+  toast.append(iconNode, messageNode);
   container.appendChild(toast);
 
   setTimeout(() => {
@@ -101,6 +106,15 @@ window.renderMarkdown = function(text) {
   html = html.replace(/<\/ul>\s*<ul>/g, ''); // 拼接相连的列表
   
   return '<p>' + html.replace(/\n/g, '<br>') + '</p>';
+};
+
+window.escapeHTML = function(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 };
 
 // 3. Tab 标签切换路由控制
@@ -218,7 +232,12 @@ async function testAndSaveSettings(url, key, isInitial = false) {
 
 function saveCredentials(url, key, serverInfo) {
   localStorage.setItem('noteweb_url', url);
-  localStorage.setItem('noteweb_key', key);
+  sessionStorage.setItem('noteweb_key', key);
+  if (document.getElementById('settings-remember-key').checked) {
+    localStorage.setItem('noteweb_key', key);
+  } else {
+    localStorage.removeItem('noteweb_key');
+  }
   
   window.apiClient.setCredentials(url, key);
   
@@ -238,11 +257,21 @@ function saveCredentials(url, key, serverInfo) {
 // 6. DOM 初始化与全局绑定
 document.addEventListener('DOMContentLoaded', async () => {
   // 读取本地存储配置并加载
-  const savedURL = localStorage.getItem('noteweb_url') || 'http://127.0.0.1:8000';
-  const savedKey = localStorage.getItem('noteweb_key') || '';
+  const savedURL = localStorage.getItem('noteweb_url') || window.location.origin;
+  const persistentKey = localStorage.getItem('noteweb_key') || '';
+  const savedKey = sessionStorage.getItem('noteweb_key') || persistentKey;
 
   document.getElementById('settings-url').value = savedURL;
   document.getElementById('settings-key').value = savedKey;
+  document.getElementById('settings-remember-key').checked = Boolean(persistentKey);
+
+  const mobileNav = document.getElementById('btn-mobile-nav');
+  const sidebar = document.querySelector('.sidebar');
+  mobileNav.addEventListener('click', () => {
+    const open = sidebar.classList.toggle('mobile-open');
+    mobileNav.setAttribute('aria-expanded', String(open));
+    mobileNav.textContent = open ? '×' : '☰';
+  });
 
   if (savedKey) {
     // 异步测试验证，不阻碍首屏渲染

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   gateway:
     build: .
@@ -10,8 +8,10 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      # 必须设置为 1，允许外部绑定调用
-      - NOTEBOOKLM_SERVER_ALLOW_EXTERNAL_BIND=1
-      # 网关全局管理 Token，用于桌面客户端推送凭证以及网页控制台鉴权
-      - NOTEBOOKLM_ADMIN_TOKEN=${GATEWAY_ADMIN_TOKEN:-admin_secret_token_change_me}
-    restart: always
+      GATEWAY_ADMIN_TOKEN: ${GATEWAY_ADMIN_TOKEN:?请在 .env 中设置强随机管理令牌}
+      GATEWAY_CORS_ORIGINS: ${GATEWAY_CORS_ORIGINS:-}
+      GATEWAY_MAX_CLIENTS: ${GATEWAY_MAX_CLIENTS:-20}
+      GATEWAY_CLIENT_IDLE_SECONDS: ${GATEWAY_CLIENT_IDLE_SECONDS:-1800}
+      GATEWAY_KEEPALIVE_SECONDS: ${GATEWAY_KEEPALIVE_SECONDS:-600}
+      GATEWAY_MAX_UPLOAD_BYTES: ${GATEWAY_MAX_UPLOAD_BYTES:-104857600}
+    restart: unless-stopped

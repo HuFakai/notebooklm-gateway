@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import asyncio
 import httpx
 import traceback
 from pathlib import Path
@@ -21,12 +20,10 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal
 
-# 导入底层的主令牌登录和同步逻辑
-from gateway_server.notebooklm.cli.services.login import master_token as mt_service
-from gateway_server.notebooklm.auth import generate_android_id
+from notebooklm.notebooklm_cli import cli as notebooklm_cli
 
 class LoginWorker(QThread):
-    """用于在后台运行 Playwright 捕获主令牌和铸造 Cookie 的线程，防止 UI 假死"""
+    """在后台调用 notebooklm-py 官方登录命令，避免 GUI 假死。"""
     log_signal = Signal(str)
     success_signal = Signal(dict)
     error_signal = Signal(str)
@@ -38,71 +35,40 @@ class LoginWorker(QThread):
 
     def run(self):
         try:
-            self.log_signal.emit("🚀 [1/3] 正在拉起 Google 登录浏览器窗口，请在弹出的浏览器中完成登录...")
-            
-            # 1. 拦截 oauth_token (Master Token 阶段 1)
-            token = mt_service.capture_oauth_token(browser=self.browser_type)
-            if not token:
-                self.error_signal.emit("❌ 未捕获到主令牌，请确保登录成功并进入了 NotebookLM 页面。")
-                return
-
-            self.log_signal.emit("✅ 成功捕获主令牌 (Master Token)。")
-            self.log_signal.emit("🚀 [2/3] 正在向 Google 铸造 API Session Cookies 并生成关联配置...")
-
-            # 2. 模拟本地路径，用于 bootstrap 生成临时凭证
+            self.log_signal.emit("🚀 正在启动 notebooklm-py 标准登录窗口，请完成 Google 登录...")
             temp_profile_dir = CLIENT_DIR / "temp_profile"
             temp_profile_dir.mkdir(exist_ok=True)
             storage_path = temp_profile_dir / "storage_state.json"
-            master_token_path = temp_profile_dir / "master_token.json"
+            storage_path.unlink(missing_ok=True)
 
-            if master_token_path.exists():
-                os.remove(master_token_path)
-            if storage_path.exists():
-                os.remove(storage_path)
-
-            android_id = generate_android_id()
-            self.log_signal.emit(f"   - 自动生成安卓客户端 ID: {android_id}")
-
-            # 3. 运行同步异步机制生成 credentials 
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-            self.log_signal.emit("   - 正在调用 Google API 并保存 credentials，这可能需要数秒...")
-            loop.run_until_complete(
-                mt_service.bootstrap(
-                    email=self.email,
-                    oauth_token=token,
-                    android_id=android_id,
-                    storage_path=storage_path,
-                    master_token_path=master_token_path,
-                    force=True
-                )
+            # notebooklm login 是 SDK 文档承诺的公开登录入口。这里直接复用其
+            # Click 命令，打包后也不依赖外部 notebooklm 可执行文件。
+            notebooklm_cli.main(
+                args=[
+                    "login",
+                    "--storage",
+                    str(storage_path),
+                    "--browser",
+                    self.browser_type,
+                    "--fresh",
+                ],
+                standalone_mode=False,
             )
 
-            # 读取生成的数据
-            if not storage_path.exists() or not master_token_path.exists():
-                self.error_signal.emit("❌ 铸造 Cookie 失败，凭证文件未能成功生成到本地。")
+            if not storage_path.exists():
+                self.error_signal.emit("❌ 登录完成后未生成 storage_state.json。")
                 return
 
             with open(storage_path, "r", encoding="utf-8") as f:
                 storage_state = f.read()
-            with open(master_token_path, "r", encoding="utf-8") as f:
-                master_token_obj = json.load(f)
-                master_token = master_token_obj.get("master_token")
-
-            self.log_signal.emit("🚀 [3/3] 正在清理本地临时运行环境缓存...")
-            # 清理临时文件
-            os.remove(storage_path)
-            os.remove(master_token_path)
+            json.loads(storage_state)
+            storage_path.unlink(missing_ok=True)
             try:
                 temp_profile_dir.rmdir()
-            except Exception:
+            except OSError:
                 pass
 
-            self.success_signal.emit({
-                "master_token": master_token,
-                "storage_state": storage_state
-            })
+            self.success_signal.emit({"storage_state": storage_state})
 
         except Exception as e:
             detailed_tb = traceback.format_exc()
@@ -277,9 +243,7 @@ class MainWindow(QMainWindow):
                 with open(settings_file, "r", encoding="utf-8") as f:
                     settings = json.load(f)
                     self.txt_url.setText(settings.get("url", ""))
-                    self.txt_admin_token.setText(settings.get("admin_token", ""))
                     self.txt_email.setText(settings.get("email", ""))
-                    self.txt_api_key.setText(settings.get("api_key", ""))
         except Exception:
             pass
 
@@ -288,13 +252,12 @@ class MainWindow(QMainWindow):
         try:
             settings = {
                 "url": self.txt_url.text().strip(),
-                "admin_token": self.txt_admin_token.text().strip(),
-                "email": self.txt_email.text().strip(),
-                "api_key": self.txt_api_key.text().strip()
+                "email": self.txt_email.text().strip()
             }
             settings_file = CLIENT_DIR / "settings.json"
-            with open(settings_file, "w", encoding="utf-8") as f:
-                json.dump(settings, f)
+            fd = os.open(settings_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(settings, f, ensure_ascii=False)
         except Exception:
             pass
 
@@ -326,7 +289,7 @@ class MainWindow(QMainWindow):
 
     def on_login_success(self, creds):
         self.captured_credentials = creds
-        self.log("✅ 凭证抓取并铸造成功！已在内存中暂存。")
+        self.log("✅ 标准会话凭证获取成功，已仅在内存中暂存。")
         self.btn_login.setEnabled(True)
         self.btn_upload.setEnabled(True)
 
@@ -359,7 +322,6 @@ class MainWindow(QMainWindow):
         payload = {
             "email": email,
             "api_key": api_key,
-            "master_token": self.captured_credentials["master_token"],
             "storage_state": self.captured_credentials["storage_state"]
         }
 

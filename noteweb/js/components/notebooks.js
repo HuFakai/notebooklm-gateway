@@ -34,13 +34,13 @@ export function renderNotebooksList() {
     const isActive = nb.id === window.state.currentNotebookId ? 'active' : '';
     const sourcesCount = nb.sources_count !== undefined ? nb.sources_count : 0;
     return `
-      <div class="list-item notebook-item ${isActive}" data-id="${nb.id}">
+      <div class="list-item notebook-item ${isActive}" data-id="${window.escapeHTML(nb.id)}">
         <div class="item-info">
           <svg class="item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
           </svg>
-          <span class="item-name" title="${nb.title}">${nb.title}</span>
+          <span class="item-name" title="${window.escapeHTML(nb.title)}">${window.escapeHTML(nb.title)}</span>
         </div>
         <span class="item-count">${sourcesCount} 源</span>
       </div>
