@@ -355,6 +355,18 @@
                     <div class="type-avatar">📊</div>
                     <div class="type-name">幻灯片 (Slides)</div>
                   </div>
+                  <div class="artifact-type-btn" data-type="video">
+                    <div class="type-avatar">🎬</div>
+                    <div class="type-name">智能视频 (Video)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="infographic">
+                    <div class="type-avatar">🎨</div>
+                    <div class="type-name">信息图 (Infographic)</div>
+                  </div>
+                  <div class="artifact-type-btn" data-type="data-table">
+                    <div class="type-avatar">📅</div>
+                    <div class="type-name">数据表格 (Table)</div>
+                  </div>
                 </div>
 
                 <!-- 动态生成物参数配置表单 -->
@@ -682,6 +694,22 @@
         <!-- 3.6.4 其他类型（如脑图）的 JSON 展示 -->
         <div id="artifact-default-container" class="artifact-subview hidden">
           <pre id="artifact-raw-json" class="json-code"></pre>
+        </div>
+
+        <!-- 3.6.5 视频播放器展示 -->
+        <div id="artifact-video-container" class="artifact-subview hidden">
+          <div class="video-player-card" style="text-align: center;">
+            <video id="artifact-video-player" controls style="width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: #000;"></video>
+            <h4 style="margin-top: 1rem; color: var(--neon-blue);">智能视频生成完毕</h4>
+          </div>
+        </div>
+        
+        <!-- 3.6.6 信息图展示 -->
+        <div id="artifact-image-container" class="artifact-subview hidden">
+          <div class="image-preview-card" style="text-align: center; padding: 1rem;">
+            <img id="artifact-image-preview" style="max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+            <h4 style="margin-top: 1rem; color: var(--neon-purple);">信息图生成完毕</h4>
+          </div>
         </div>
       </div>
       <div class="modal-footer">

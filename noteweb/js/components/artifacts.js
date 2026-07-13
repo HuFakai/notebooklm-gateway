@@ -104,6 +104,58 @@ const OPTION_TEMPLATES = {
         </select>
       </div>
     </div>
+  `,
+  video: `
+    <div class="form-row">
+      <div class="form-group flex-1">
+        <label for="art-opt-video-format">视频格式</label>
+        <select id="art-opt-video-format">
+          <option value="explainer">概念讲解 (Explainer)</option>
+          <option value="brief">简短演示 (Brief)</option>
+          <option value="cinematic">电影级 (Cinematic)</option>
+          <option value="short">短视频 (Short)</option>
+        </select>
+      </div>
+      <div class="form-group flex-1">
+        <label for="art-opt-video-style">视觉风格</label>
+        <select id="art-opt-video-style">
+          <option value="auto">自动 (Auto)</option>
+          <option value="watercolor">水彩画 (Watercolor)</option>
+          <option value="anime">动漫风 (Anime)</option>
+          <option value="custom">自定义 (Custom)</option>
+        </select>
+      </div>
+    </div>
+  `,
+  infographic: `
+    <div class="form-row">
+      <div class="form-group flex-1">
+        <label for="art-opt-info-orientation">排版方向</label>
+        <select id="art-opt-info-orientation">
+          <option value="portrait">竖屏 (Portrait)</option>
+          <option value="landscape">横屏 (Landscape)</option>
+          <option value="square">正方形 (Square)</option>
+        </select>
+      </div>
+      <div class="form-group flex-1">
+        <label for="art-opt-info-detail">精细程度</label>
+        <select id="art-opt-info-detail">
+          <option value="standard">标准 (Standard)</option>
+          <option value="concise">精简 (Concise)</option>
+          <option value="detailed">详尽 (Detailed)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="art-opt-info-style">风格描述</label>
+      <input type="text" id="art-opt-info-style" class="form-control" placeholder="例如：极简扁平化，深色科技风" value="auto" style="width: 100%; padding: 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm); color: var(--text-primary);">
+    </div>
+  `,
+  'data-table': `
+    <div class="form-group">
+      <label>数据表格构建说明</label>
+      <p class="subtitle" style="margin-top: 0.2rem; color: var(--text-muted); font-size: 0.75rem;">请在底部的自定义指令中输入您想生成表格的数据提取和汇总需求（例如：“整理一份核心技术指标与对比表格”）。</p>
+    </div>
   `
 };
 
@@ -181,6 +233,9 @@ export async function renderArtifactsTab() {
       else if (art.type === 'flashcards') emoji = '🎴';
       else if (art.type === 'mind-map') emoji = '🧠';
       else if (art.type === 'slide-deck') emoji = '📊';
+      else if (art.type === 'video') emoji = '🎬';
+      else if (art.type === 'infographic') emoji = '🎨';
+      else if (art.type === 'data-table') emoji = '📅';
 
       // 状态 Badge 颜色
       const status = art.status ? art.status.toLowerCase() : 'completed';
@@ -317,6 +372,13 @@ async function generateArtifactSubmit() {
   } else if (type === 'slide-deck') {
     payload.deck_format = document.getElementById('art-opt-deck-format').value;
     payload.deck_length = document.getElementById('art-opt-deck-length').value;
+  } else if (type === 'video') {
+    payload.video_format = document.getElementById('art-opt-video-format').value;
+    payload.style = document.getElementById('art-opt-video-style').value;
+  } else if (type === 'infographic') {
+    payload.orientation = document.getElementById('art-opt-info-orientation').value;
+    payload.detail = document.getElementById('art-opt-info-detail').value;
+    payload.style = document.getElementById('art-opt-info-style').value.trim() || 'auto';
   }
 
   const btnGen = document.getElementById('btn-generate-artifact');
@@ -340,7 +402,10 @@ async function generateArtifactSubmit() {
         quiz: '智能测验 (Quiz)',
         flashcards: '互动闪卡 (Flashcards)',
         'mind-map': '思维导图 (Mindmap)',
-        'slide-deck': '幻灯片 (Slides)'
+        'slide-deck': '幻灯片 (Slides)',
+        video: '智能视频 (Video)',
+        infographic: '信息图 (Infographic)',
+        'data-table': '数据表格 (Table)'
       };
       const typeName = typeNames[payload.type] || payload.type;
       
@@ -451,7 +516,23 @@ async function viewArtifact(artifactId, type) {
       audioPlayer.onpause = () => discWrapper.classList.remove('playing');
       audioPlayer.onended = () => discWrapper.classList.remove('playing');
 
-    } else if (type === 'report' || type === 'quiz' || type === 'flashcards' || type === 'mind-map' || type === 'slide-deck') {
+    } else if (type === 'video') {
+      const videoContainer = document.getElementById('artifact-video-container');
+      const videoPlayer = document.getElementById('artifact-video-player');
+      
+      const videoUrl = URL.createObjectURL(blob);
+      videoPlayer.src = videoUrl;
+      videoContainer.classList.remove('hidden');
+
+    } else if (type === 'infographic') {
+      const imageContainer = document.getElementById('artifact-image-container');
+      const imagePreview = document.getElementById('artifact-image-preview');
+      
+      const imageUrl = URL.createObjectURL(blob);
+      imagePreview.src = imageUrl;
+      imageContainer.classList.remove('hidden');
+
+    } else if (type === 'report' || type === 'quiz' || type === 'flashcards' || type === 'mind-map' || type === 'slide-deck' || type === 'data-table') {
       const text = await blob.text();
       
       if (type === 'report' || type === 'slide-deck') {
@@ -459,6 +540,23 @@ async function viewArtifact(artifactId, type) {
         const reportContainer = document.getElementById('artifact-report-container');
         const reportText = document.getElementById('artifact-report-text');
         reportText.innerHTML = window.renderMarkdown(text || "生成物文本内容为空。");
+        reportContainer.classList.remove('hidden');
+
+      } else if (type === 'data-table') {
+        // 将 CSV 数据转换为漂亮的 Markdown 表格渲染
+        const reportContainer = document.getElementById('artifact-report-container');
+        const reportText = document.getElementById('artifact-report-text');
+        const lines = (text || "").split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if (lines.length > 0) {
+          const headers = lines[0].split(',');
+          const mdRows = lines.slice(1).map(l => {
+            return '| ' + l.split(',').join(' | ') + ' |';
+          });
+          const mdTable = `| ${headers.join(' | ')} |\n| ${headers.map(() => '---').join(' | ')} |\n${mdRows.join('\n')}`;
+          reportText.innerHTML = window.renderMarkdown(mdTable);
+        } else {
+          reportText.innerHTML = "数据表格内容为空。";
+        }
         reportContainer.classList.remove('hidden');
 
       } else if (type === 'quiz') {
