@@ -138,3 +138,27 @@ async def save_to_note(notebook_id: str, body: ChatSaveNote, client: ClientDep) 
 
     note = await client.chat.save_answer_as_note(notebook_id, ask_result, title=body.title)
     return to_jsonable(note)
+
+
+@router.get("/history")
+async def get_chat_history(
+    notebook_id: str,
+    client: ClientDep,
+    limit: int = 100,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
+    """Retrieve previous Q&A chat history for a conversation."""
+    history = await client.chat.get_history(
+        notebook_id,
+        limit=limit,
+        conversation_id=conversation_id,
+    )
+    formatted_history = [
+        {"question": q, "answer": a}
+        for q, a in history
+    ]
+    conv_id = conversation_id or await client.chat.get_conversation_id(notebook_id)
+    return {
+        "conversation_id": conv_id,
+        "history": formatted_history,
+    }

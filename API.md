@@ -515,6 +515,29 @@
     }
     ```
 
+#### 2.4.5 获取历史对话记录
+*   **方法/路径**：`GET /v1/notebooks/{notebook_id}/chat/history`
+*   **说明**：获取指定笔记本的历史对话（问答对）记录，按时间正序（最早的排在最前）。
+*   **请求 Query 参数**：
+    *   `limit` (可选, integer): 最大获取的对话轮数，默认为 `100`。
+    *   `conversation_id` (可选, string): 特定会话 ID。如果缺省，则会自动拉取当前笔记本中最近活跃的那个会话的记录。
+*   **返回字段详情 (JSON)**：
+    *   `conversation_id` (string): 本次获取到的对话会话 UUID。
+    *   `history` (array): 对话记录列表。每个元素包含：
+        *   `question` (string): 用户提问内容。
+        *   `answer` (string): AI 回答的文本正文。
+    ```json
+    {
+      "conversation_id": "8a095783-9acc-4f0f-88f3-54d32f0099ab",
+      "history": [
+        {
+          "question": "中国嫦娥探测器起到了什么作用？",
+          "answer": "中国嫦娥探测器在月球背面成功着陆并采样[1]。"
+        }
+      ]
+    }
+    ```
+
 ---
 
 ### 2.5 深度探索与搜索集成 (Deep Research)
