@@ -224,6 +224,14 @@ export class APIClient {
     }
   }
 
+  async saveChatToNote(notebookId, answer, references, title = null) {
+    return this.request('POST', `/v1/notebooks/${notebookId}/chat/save_to_note`, {
+      answer,
+      references,
+      title
+    });
+  }
+
   // ==========================================
   // 5. 深度探索 (Deep Research)
   // ==========================================

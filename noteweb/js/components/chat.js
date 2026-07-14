@@ -176,6 +176,54 @@ async function sendChatMessage() {
       if (result && result.references && result.references.length > 0) {
         renderReferences(aiMsg, result.references);
       }
+
+      // 添加操作工具条：保存到笔记、复制文本等
+      const actionBar = document.createElement('div');
+      actionBar.className = 'msg-action-bar';
+      actionBar.style = 'display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);';
+      
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn-msg-action';
+      saveBtn.style = 'background: none; border: none; color: var(--neon-blue); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; transition: background 0.2s;';
+      saveBtn.innerHTML = '📌 <span>保存到笔记</span>';
+      saveBtn.onmouseover = () => saveBtn.style.background = 'rgba(255,255,255,0.05)';
+      saveBtn.onmouseout = () => saveBtn.style.background = 'none';
+      
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        saveBtn.querySelector('span').textContent = '正在保存...';
+        try {
+          const noteTitle = question.substring(0, 30) || result.answer.substring(0, 20);
+          await window.apiClient.saveChatToNote(notebookId, result.answer, result.references || [], noteTitle);
+          window.showToast('成功保存到笔记！', 'success');
+          saveBtn.querySelector('span').textContent = '已保存';
+          
+          const activeTab = document.querySelector('.sidebar-menu-item.active');
+          if (activeTab && activeTab.getAttribute('data-tab') === 'notes') {
+            const notesModule = await import('./notes.js');
+            notesModule.renderNotesTab();
+          }
+        } catch (err) {
+          window.showToast(`保存失败: ${err.message}`, 'error');
+          saveBtn.querySelector('span').textContent = '保存到笔记';
+          saveBtn.disabled = false;
+        }
+      });
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'btn-msg-action';
+      copyBtn.style = 'background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; transition: background 0.2s;';
+      copyBtn.innerHTML = '📋 <span>复制</span>';
+      copyBtn.onmouseover = () => copyBtn.style.background = 'rgba(255,255,255,0.05)';
+      copyBtn.onmouseout = () => copyBtn.style.background = 'none';
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(result.answer);
+        window.showToast('已复制到剪贴板', 'success');
+      });
+
+      actionBar.appendChild(saveBtn);
+      actionBar.appendChild(copyBtn);
+      aiMsg.appendChild(actionBar);
     },
     // onError
     (err) => {
@@ -195,13 +243,16 @@ function renderReferences(messageEl, references) {
   
   const refList = refContainer.querySelector('.ref-list');
   references.forEach((ref, idx) => {
+    const src = window.state.sources ? window.state.sources.find(s => s.id === ref.source_id) : null;
+    const sourceTitle = src ? src.title : '参考文档';
+
     const chip = document.createElement('span');
     chip.className = 'ref-chip';
-    chip.textContent = `${idx + 1}. ${ref.source_title || '未命名文档'}`;
+    chip.textContent = `${idx + 1}. ${sourceTitle}`;
     
     // 点击小卡片，弹窗展示精确引用的原文文本
     chip.addEventListener('click', () => {
-      alert(`引用自《${ref.source_title}》的原文片段：\n\n${ref.quotes.join('\n\n')}`);
+      alert(`引用自《${sourceTitle}》的原文片段：\n\n${ref.cited_text || '暂无原文片段'}`);
     });
     refList.appendChild(chip);
   });

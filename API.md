@@ -434,20 +434,85 @@
     }
     ```
 
-#### 2.4.3 发起对话 (支持 SSE 流式返回)
+#### 2.4.3 发起对话 (同步阻塞返回)
 *   **方法/路径**：`POST /v1/notebooks/{notebook_id}/chat`
-*   **请求 Body (JSON)**：
+*   **说明**：向笔记本的文档来源库发起提问。该接口为**同步阻塞式 JSON 接口**（注：前端 NoteWeb 通过打字机效果模拟流式输出，以确保动画顺滑度）。
+*   **请求参数详情**：
+    *   `question` (必填, string): 用户输入的提问内容。
+    *   `conversation_id` (可选, string): 历史对话会话 ID。如果传入，AI 会继承上下文继续对话；如果留空或传入 `null`，网关会自动加载该笔记本的最新会话，或者开启新会话。
     ```json
     {
       "question": "中国嫦娥探测器起到了什么作用？",
       "conversation_id": null
     }
     ```
-*   **响应流 (Server-Sent Events)**：返回格式为 `data: <JSON>` 字符串，直到以 `data: [DONE]` 截止：
-    ```text
-    data: {"text": "中"}
-    data: {"text": "国"}
-    data: [DONE]
+*   **返回字段详情 (JSON)**：
+    *   `answer` (string): AI 生成的回答内容（通常内嵌 `[1]` 等引用角标）。
+    *   `conversation_id` (string): 本次对话所属的会话 ID，后续轮次对话可通过该 ID 继承上下文。
+    *   `turn_number` (integer): 当前会话的轮次序号。
+    *   `is_follow_up` (boolean): 是否是追问问题。
+    *   `references` (array): 包含的引用源数据项列表。每个元素具有以下属性：
+        *   `source_id` (string): 引用文档来源的 UUID。
+        *   `citation_number` (integer): 引用序号（对应回答中的角标数字）。
+        *   `cited_text` (string): 从文档中精确提取并供 AI 回答引用的原文片段。
+        *   `start_char` / `end_char` (integer): 引用段落字符偏移量。
+        *   `answer_start_char` / `answer_end_char` (integer): 该引用在回答文本中所支撑的具体区间的起止位置。
+    ```json
+    {
+      "answer": "中国嫦娥探测器在月球背面成功着陆并采样[1]。",
+      "conversation_id": "8a095783-9acc-4f0f-88f3-54d32f0099ab",
+      "turn_number": 1,
+      "is_follow_up": false,
+      "references": [
+        {
+          "source_id": "doc-uuid-1111-2222",
+          "citation_number": 1,
+          "cited_text": "嫦娥探测器采样任务取得圆满成功，带回月球土壤样本。",
+          "start_char": 204,
+          "end_char": 235,
+          "answer_start_char": 15,
+          "answer_end_char": 22,
+          "score": 0.95
+        }
+      ]
+    }
+    ```
+
+#### 2.4.4 保存对话回答到笔记
+*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/chat/save_to_note`
+*   **说明**：将单次对话的回答（包含精细的引角标与定位锚点）作为一篇“保存自对话”的富文本笔记保存到笔记本中。这能在 NotebookLM 官方 Web 界面中完美呈现可点击的高亮引用悬浮窗。
+*   **请求参数详情**：
+    *   `answer` (必填, string): 对话的完整回答文本（必须保留回答中的 `[1]` 等标记）。
+    *   `title` (可选, string): 保存后的笔记标题。如果留空或传入 `null`，网关会自动截取回答的前 50 个字符。
+    *   `references` (可选, array): 对应回答中所有引用源列表（需从发起对话的 `references` 列表中原样传入，当 `references` 为空时，此接口会报错，应转而使用普通笔记创建接口）。包含属性：
+        *   `source_id` (必填, string): 引用的来源文档 ID。
+        *   `citation_number` (可选, integer): 引用编号（例如 `1`）。
+        *   `cited_text` (可选, string): 引用内容原文。
+    ```json
+    {
+      "answer": "中国嫦娥探测器在月球背面成功着陆并采样[1]。",
+      "title": "嫦娥探测器月球背面任务简述",
+      "references": [
+        {
+          "source_id": "doc-uuid-1111-2222",
+          "citation_number": 1,
+          "cited_text": "嫦娥探测器采样任务取得圆满成功，带回月球土壤样本。"
+        }
+      ]
+    }
+    ```
+*   **返回字段详情 (JSON)**：
+    *   `id` (string): 新创建的笔记的 UUID。
+    *   `title` (string): 实际存储的笔记标题（后端服务器可能会在用户标题基础之上进行润色或生成）。
+    *   `content` (string): 存储的笔记正文。
+    *   `created_at` (string): 创建时间。
+    ```json
+    {
+      "id": "note-uuid-8888-9999",
+      "title": "嫦娥探测器月球背面任务简述",
+      "content": "中国嫦娥探测器在月球背面成功着陆并采样[1]。",
+      "created_at": "2026-07-14T14:15:30Z"
+    }
     ```
 
 ---

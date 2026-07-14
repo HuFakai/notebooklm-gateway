@@ -14,6 +14,12 @@ if project_root not in sys.path:
 # 桌面端程序本地工作目录
 CLIENT_DIR = Path(__file__).resolve().parent
 
+def get_icon_path():
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, 'gateway_client', 'logo.png')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logo.png')
+
+
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
@@ -401,6 +407,13 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    
+    # 设置应用窗口图标
+    from PySide6.QtGui import QIcon
+    icon_path = get_icon_path()
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+        
     window = MainWindow()
     window.show()
     sys.exit(app.exec())

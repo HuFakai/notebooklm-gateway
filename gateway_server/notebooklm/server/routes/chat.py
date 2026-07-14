@@ -94,3 +94,47 @@ async def configure(notebook_id: str, body: ChatConfigure, client: ClientDep) ->
         response_length=body.response_length,
     )
     return {"status": "configured", **to_jsonable(result)}
+
+
+class ChatSaveNote(BaseModel):
+    """Request body for saving a chat answer as a citation-rich note."""
+
+    answer: str
+    references: list[dict[str, Any]] = []
+    title: str | None = None
+
+
+@router.post("/save_to_note", status_code=201)
+async def save_to_note(notebook_id: str, body: ChatSaveNote, client: ClientDep) -> dict[str, Any]:
+    """Save a chat answer as a citation-rich note."""
+    from ..._types.chat import AskResult, ChatReference
+
+    # Reconstruct ChatReference list
+    refs = []
+    for r in body.references:
+        refs.append(
+            ChatReference(
+                source_id=r.get("source_id", ""),
+                citation_number=r.get("citation_number"),
+                cited_text=r.get("cited_text"),
+                start_char=r.get("start_char"),
+                end_char=r.get("end_char"),
+                chunk_id=r.get("chunk_id"),
+                passage_id=r.get("passage_id"),
+                answer_start_char=r.get("answer_start_char"),
+                answer_end_char=r.get("answer_end_char"),
+                score=r.get("score"),
+            )
+        )
+
+    # Reconstruct AskResult
+    ask_result = AskResult(
+        answer=body.answer,
+        references=refs,
+        conversation_id="",
+        turn_number=1,
+        is_follow_up=False,
+    )
+
+    note = await client.chat.save_answer_as_note(notebook_id, ask_result, title=body.title)
+    return to_jsonable(note)
