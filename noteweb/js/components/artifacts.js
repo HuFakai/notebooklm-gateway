@@ -147,8 +147,20 @@ const OPTION_TEMPLATES = {
       </div>
     </div>
     <div class="form-group">
-      <label for="art-opt-info-style">风格描述</label>
-      <input type="text" id="art-opt-info-style" class="form-control" placeholder="例如：极简扁平化，深色科技风" value="auto" style="width: 100%; padding: 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--radius-sm); color: var(--text-primary);">
+      <label for="art-opt-info-style">视觉风格</label>
+      <select id="art-opt-info-style">
+        <option value="auto">自动 (Auto)</option>
+        <option value="professional">专业设计 (Professional)</option>
+        <option value="sketch-note">手绘手账 (Sketch-note)</option>
+        <option value="bento-grid">便当网格 (Bento-grid)</option>
+        <option value="editorial">社论版面 (Editorial)</option>
+        <option value="instructional">教学说明 (Instructional)</option>
+        <option value="bricks">砖块拼贴 (Bricks)</option>
+        <option value="clay">黏土风 (Clay)</option>
+        <option value="anime">动漫风 (Anime)</option>
+        <option value="kawaii">卡哇伊萌系 (Kawaii)</option>
+        <option value="scientific">科学图表 (Scientific)</option>
+      </select>
     </div>
   `,
   'data-table': `
@@ -218,6 +230,13 @@ export async function renderArtifactsTab() {
 
     // 合并 pending 任务与服务器返回 of 已完成任务
     const mergedList = [...window.state.pendingTasks, ...list];
+
+    // 重新进入网页或切换笔记本时，自动为所有未完成的本地排队任务重新启动状态轮询监测
+    window.state.pendingTasks.forEach(pt => {
+      if (pt.status === 'in_progress' || pt.status === 'pending' || pt.status === 'processing') {
+        startPollingArtifact(notebookId, pt.id);
+      }
+    });
 
     if (mergedList.length === 0) {
       listContainer.innerHTML = '<div class="empty-state">尚未创建任何智能生成物</div>';

@@ -86,7 +86,7 @@ source .venv/bin/activate
 # .venv\Scripts\Activate.ps1
 
 # 3. 安装客户端所必须的依赖项与浏览器驱动
-pip install PySide6 playwright httpx pyinstaller
+pip install PySide6 playwright httpx pyinstaller pillow
 playwright install chrome
 
 # 4. 启动本地助手

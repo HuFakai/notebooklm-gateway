@@ -67,14 +67,102 @@ export function initChat() {
   });
 }
 
-// 渲染对话界面（加载引导词）
+// 渲染对话界面（加载历史记录与引导词）
 export async function renderChatTab() {
   const notebookId = window.state.currentNotebookId;
   if (!notebookId) return;
 
+  const messagesList = document.getElementById('chat-messages');
+  const welcome = document.querySelector('.chat-welcome');
   const suggestionsContainer = document.getElementById('chat-suggestions');
   const chipsContainer = document.getElementById('suggestions-chips');
 
+  // 1. 获取并展示历史聊天记录
+  try {
+    const res = await window.apiClient.request('GET', `/v1/notebooks/${notebookId}/chat/history?limit=30`);
+    if (res && res.history && res.history.length > 0) {
+      activeConversationId = res.conversation_id;
+      if (welcome) welcome.classList.add('hidden');
+      messagesList.innerHTML = '';
+
+      res.history.forEach(item => {
+        // 用户问题
+        const userMsg = document.createElement('div');
+        userMsg.className = 'message user';
+        userMsg.innerHTML = `
+          <div class="msg-avatar">👤</div>
+          <div class="msg-bubble">${escapeHTML(item.question)}</div>
+        `;
+        messagesList.appendChild(userMsg);
+
+        // AI 答案
+        const aiMsg = document.createElement('div');
+        aiMsg.className = 'message assistant';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble';
+        bubble.innerHTML = window.renderMarkdown(item.answer);
+        aiMsg.appendChild(bubble);
+
+        // 操作栏
+        const actionBar = document.createElement('div');
+        actionBar.className = 'msg-action-bar';
+        actionBar.style = 'display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);';
+        
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn-msg-action';
+        saveBtn.style = 'background: none; border: none; color: var(--neon-blue); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; transition: background 0.2s;';
+        saveBtn.innerHTML = '📌 <span>保存到笔记</span>';
+        saveBtn.onmouseover = () => saveBtn.style.background = 'rgba(255,255,255,0.05)';
+        saveBtn.onmouseout = () => saveBtn.style.background = 'none';
+        
+        saveBtn.addEventListener('click', async () => {
+          saveBtn.disabled = true;
+          saveBtn.querySelector('span').textContent = '正在保存...';
+          try {
+            await window.apiClient.createNote(notebookId, item.question.substring(0, 30) || item.answer.substring(0, 20), item.answer);
+            window.showToast('成功保存到笔记！', 'success');
+            saveBtn.querySelector('span').textContent = '已保存';
+            
+            const activeTab = document.querySelector('.sidebar-menu-item.active');
+            if (activeTab && activeTab.getAttribute('data-tab') === 'notes') {
+              const notesModule = await import('./notes.js');
+              notesModule.renderNotesTab();
+            }
+          } catch (err) {
+            window.showToast(`保存失败: ${err.message}`, 'error');
+            saveBtn.querySelector('span').textContent = '保存到笔记';
+            saveBtn.disabled = false;
+          }
+        });
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn-msg-action';
+        copyBtn.style = 'background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; font-size: 0.8rem; padding: 0.2rem 0.5rem; border-radius: 4px; transition: background 0.2s;';
+        copyBtn.innerHTML = '📋 <span>复制</span>';
+        copyBtn.onmouseover = () => copyBtn.style.background = 'rgba(255,255,255,0.05)';
+        copyBtn.onmouseout = () => copyBtn.style.background = 'none';
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(item.answer);
+          window.showToast('已复制到剪贴板', 'success');
+        });
+
+        actionBar.appendChild(saveBtn);
+        actionBar.appendChild(copyBtn);
+        bubble.appendChild(actionBar);
+        messagesList.appendChild(aiMsg);
+      });
+      messagesList.scrollTop = messagesList.scrollHeight;
+    } else {
+      messagesList.innerHTML = '';
+      if (welcome) welcome.classList.remove('hidden');
+      activeConversationId = null;
+    }
+  } catch (err) {
+    console.warn('获取历史对话记录失败:', err);
+  }
+
+  // 2. 加载引导推荐词
   try {
     const suggestions = await window.apiClient.getSuggestedPrompts(notebookId);
     if (suggestions && suggestions.length > 0) {
@@ -83,7 +171,6 @@ export async function renderChatTab() {
         <div class="suggestion-chip" data-prompt="${encodeURIComponent(s.prompt)}">${s.title}</div>
       `).join('');
 
-      // 绑定芯片点击
       chipsContainer.querySelectorAll('.suggestion-chip').forEach(chip => {
         chip.addEventListener('click', () => {
           const promptText = decodeURIComponent(chip.getAttribute('data-prompt'));
@@ -174,7 +261,7 @@ async function sendChatMessage() {
         activeConversationId = result.conversation_id;
       }
       if (result && result.references && result.references.length > 0) {
-        renderReferences(aiMsg, result.references);
+        renderReferences(bubble, result.references);
       }
 
       // 添加操作工具条：保存到笔记、复制文本等
@@ -223,7 +310,7 @@ async function sendChatMessage() {
 
       actionBar.appendChild(saveBtn);
       actionBar.appendChild(copyBtn);
-      aiMsg.appendChild(actionBar);
+      bubble.appendChild(actionBar);
     },
     // onError
     (err) => {

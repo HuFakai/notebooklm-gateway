@@ -41,7 +41,7 @@ def build_app():
         import PySide6
     except ImportError:
         print("错误：打包前请先安装依赖包！请执行：")
-        print("pip install PyInstaller PySide6 httpx playwright")
+        print("pip install PyInstaller PySide6 httpx playwright pillow")
         sys.exit(1)
 
     # 动态定位当前虚拟环境下的 pyinstaller 可执行文件路径
