@@ -536,6 +536,36 @@ async def retry(
     }
 
 
+class ArtifactRevise(BaseModel):
+    slide_index: int
+    prompt: str
+
+
+@router.post("/{artifact_id}/revise", dependencies=[Depends(limit_generation)])
+async def revise(
+    notebook_id: str,
+    artifact_id: str,
+    body: ArtifactRevise,
+    client: ClientDep,
+    pending: PendingDep,
+) -> dict[str, Any]:
+    """Revise an individual slide in a completed slide deck.
+
+    Non-blocking: returns the kicked-off ``task_id`` and the new ``status``;
+    poll ``GET .../artifacts/{task_id}`` until complete.
+    """
+    status = await artifact_core.revise_slide(
+        client, notebook_id, _canonical_artifact_id(artifact_id), body.slide_index, body.prompt
+    )
+    pending.record(notebook_id, status.task_id)
+    return {
+        "notebook_id": notebook_id,
+        "artifact_id": artifact_id,
+        "task_id": status.task_id,
+        "status": to_jsonable(status.status),
+    }
+
+
 @router.delete("/{artifact_id}", status_code=204)
 async def delete(notebook_id: str, artifact_id: str, client: ClientDep) -> Response:
     """Delete an artifact (irreversible).

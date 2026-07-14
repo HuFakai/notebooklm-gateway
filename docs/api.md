@@ -772,7 +772,29 @@
     }
     ```
 
-#### 2.7.7 下载及导出已生成的智能生成物文件
+#### 2.7.7 修改/修改幻灯片单页内容 (Slide Revision)
+*   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts/{artifact_id}/revise`
+*   **请求 Body 参数 (JSON)**：
+    *   `slide_index` (必填): 待修改幻灯片的页码索引（从 `0` 开始算，例如 `0` 表示第一页）。
+    *   `prompt` (必填): 针对这一页幻灯片的具体修改或重新排版指令（例如 `"将图片置于页面中央"` 或 `"缩短标题"`）。
+*   **请求示例**：
+    ```json
+    {
+      "slide_index": 0,
+      "prompt": "将第一页的背景标题改为更显眼的科技蓝色风格"
+    }
+    ```
+*   **返回示例**：
+    ```json
+    {
+      "notebook_id": "c725a1a9...",
+      "artifact_id": "art_slide_12345",
+      "task_id": "task_revise_9988",
+      "status": "pending"
+    }
+    ```
+
+#### 2.7.8 下载及导出已生成的智能生成物文件
 *   **方法/路径**：`POST /v1/notebooks/{notebook_id}/artifacts/download`
 *   **请求 Body 参数 (JSON)**：
     *   `type` (必填): 下载类型，支持如下：

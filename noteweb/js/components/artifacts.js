@@ -500,11 +500,13 @@ function startPollingArtifact(notebookId, taskId) {
   }, 3000);
 }
 
-// 查看生成物详情 (播放音频/渲染测试卷/展示 markdown 简报)
+// 查看生成物详情 (播放音频/渲染测试卷/展示 markdown 简报/展示幻灯片PDF及修改)
 async function viewArtifact(artifactId, type) {
   const modal = document.getElementById('modal-artifact-view');
   const titleEl = document.getElementById('artifact-view-title');
   const btnDownload = document.getElementById('btn-download-artifact');
+  const formatWrapper = document.getElementById('artifact-download-selector-wrapper');
+  const formatSelect = document.getElementById('artifact-download-format');
 
   const art = window.state.artifacts.find(a => a.id === artifactId);
   titleEl.textContent = art ? art.title : '生成物详情';
@@ -512,8 +514,29 @@ async function viewArtifact(artifactId, type) {
   // 隐藏所有预览子容器
   document.querySelectorAll('.artifact-subview').forEach(el => el.classList.add('hidden'));
   
+  // 配置下载格式下拉框
+  if (type === 'slide-deck') {
+    formatWrapper.classList.remove('hidden');
+    formatSelect.innerHTML = `
+      <option value="pdf">PDF 文档 (.pdf)</option>
+      <option value="pptx">PowerPoint 演示文稿 (.pptx)</option>
+    `;
+  } else if (type === 'quiz' || type === 'flashcards') {
+    formatWrapper.classList.remove('hidden');
+    formatSelect.innerHTML = `
+      <option value="json">JSON 原始数据 (.json)</option>
+      <option value="markdown">Markdown 格式 (.md)</option>
+      <option value="html">HTML 网页格式 (.html)</option>
+    `;
+  } else {
+    formatWrapper.classList.add('hidden');
+  }
+
   // 设置下载按钮点击绑定
-  btnDownload.onclick = () => downloadFile(window.state.currentNotebookId, type, art ? art.title : `artifact-${type}`);
+  btnDownload.onclick = () => {
+    const selectedFormat = formatWrapper.classList.contains('hidden') ? null : formatSelect.value;
+    downloadFile(window.state.currentNotebookId, type, art ? art.title : `artifact-${type}`, selectedFormat);
+  };
 
   window.showModal('modal-artifact-view');
 
@@ -551,10 +574,63 @@ async function viewArtifact(artifactId, type) {
       imagePreview.src = imageUrl;
       imageContainer.classList.remove('hidden');
 
-    } else if (type === 'report' || type === 'quiz' || type === 'flashcards' || type === 'mind-map' || type === 'slide-deck' || type === 'data-table') {
+    } else if (type === 'slide-deck') {
+      const pdfContainer = document.getElementById('artifact-pdf-container');
+      const pdfViewer = document.getElementById('artifact-pdf-viewer');
+      
+      const pdfUrl = URL.createObjectURL(blob);
+      pdfViewer.src = pdfUrl;
+      pdfContainer.classList.remove('hidden');
+
+      // 绑定幻灯片修改提交事件
+      const btnSubmitRevise = document.getElementById('btn-submit-revise-slide');
+      // 清理旧绑定的事件，避免重复绑定
+      const newBtnSubmit = btnSubmitRevise.cloneNode(true);
+      btnSubmitRevise.parentNode.replaceChild(newBtnSubmit, btnSubmitRevise);
+
+      newBtnSubmit.addEventListener('click', async () => {
+        const slideIndex = document.getElementById('artifact-revise-slide-index').value;
+        const prompt = document.getElementById('artifact-revise-prompt').value.trim();
+        if (!prompt) {
+          window.showToast('请输入具体的修改指令！', 'warning');
+          return;
+        }
+
+        newBtnSubmit.disabled = true;
+        newBtnSubmit.textContent = '提交修改指令中...';
+        try {
+          const notebookId = window.state.currentNotebookId;
+          const res = await window.apiClient.reviseSlide(notebookId, artifactId, slideIndex, prompt);
+          window.showToast('修改演示文稿指令提交成功！正在云端排队生成新版本...', 'success');
+          
+          // 注册排队状态跟踪
+          const newTask = {
+            id: res.task_id,
+            title: `修订演示文稿 (第 ${parseInt(slideIndex) + 1} 页)`,
+            type: 'slide-deck',
+            status: 'in_progress',
+            created_at: new Date().toISOString()
+          };
+          window.state.pendingTasks.unshift(newTask);
+          localStorage.setItem(`pending_tasks_${notebookId}`, JSON.stringify(window.state.pendingTasks));
+          
+          // 启动状态轮询监听
+          startPollingArtifact(notebookId, res.task_id);
+          
+          // 关闭当前详情弹窗，重刷列表以显示加载态
+          window.closeModal('modal-artifact-view');
+          renderArtifactsTab();
+        } catch (err) {
+          window.showToast(`提交修订失败: ${err.message}`, 'error');
+          newBtnSubmit.disabled = false;
+          newBtnSubmit.textContent = '生成修订后的演示文稿';
+        }
+      });
+
+    } else if (type === 'report' || type === 'quiz' || type === 'flashcards' || type === 'mind-map' || type === 'data-table') {
       const text = await blob.text();
       
-      if (type === 'report' || type === 'slide-deck') {
+      if (type === 'report') {
         // 直接渲染 Markdown
         const reportContainer = document.getElementById('artifact-report-container');
         const reportText = document.getElementById('artifact-report-text');
@@ -665,9 +741,9 @@ function renderInteractiveQuiz(container, quiz) {
 }
 
 // 物理媒体下载到磁盘
-async function downloadFile(notebookId, type, filename) {
+async function downloadFile(notebookId, type, filename, outputFormat = null) {
   try {
-    const blob = await window.apiClient.downloadArtifact(notebookId, type);
+    const blob = await window.apiClient.downloadArtifact(notebookId, type, outputFormat);
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     
@@ -676,8 +752,13 @@ async function downloadFile(notebookId, type, filename) {
     if (type === 'audio') ext = '.mp3';
     else if (type === 'video') ext = '.mp4';
     else if (type === 'infographic') ext = '.png';
-    else if (type === 'slide-deck') ext = '.pdf';
-    else if (type === 'quiz' || type === 'mind-map' || type === 'flashcards') ext = '.json';
+    else if (type === 'slide-deck') {
+      ext = outputFormat === 'pptx' ? '.pptx' : '.pdf';
+    } else if (type === 'quiz' || type === 'flashcards') {
+      if (outputFormat === 'markdown') ext = '.md';
+      else if (outputFormat === 'html') ext = '.html';
+      else ext = '.json';
+    } else if (type === 'mind-map') ext = '.json';
     else if (type === 'report') ext = '.md';
     else if (type === 'data-table') ext = '.csv';
 

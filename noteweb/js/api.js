@@ -360,18 +360,29 @@ export class APIClient {
     return this.request('DELETE', `/v1/notebooks/${notebookId}/artifacts/${artifactId}`);
   }
 
+  async reviseSlide(notebookId, artifactId, slideIndex, prompt) {
+    return this.request('POST', `/v1/notebooks/${notebookId}/artifacts/${artifactId}/revise`, {
+      slide_index: parseInt(slideIndex),
+      prompt
+    });
+  }
+
   /**
    * 下载二进制媒体文件 (返回 Blob 对象)
    */
-  async downloadArtifact(notebookId, type) {
+  async downloadArtifact(notebookId, type, outputFormat = null) {
     const url = `${this.baseURL}/v1/notebooks/${notebookId}/artifacts/download`;
+    const payload = { type };
+    if (outputFormat) {
+      payload.output_format = outputFormat;
+    }
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ type })
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {

@@ -711,8 +711,54 @@
             <h4 style="margin-top: 1rem; color: var(--neon-purple);">信息图生成完毕</h4>
           </div>
         </div>
+
+        <!-- 3.6.7 PDF 幻灯片在线查看与修改面板 -->
+        <div id="artifact-pdf-container" class="artifact-subview hidden">
+          <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
+            <!-- 左侧 PDF 预览 -->
+            <div style="flex:2; min-width:400px;">
+              <iframe id="artifact-pdf-viewer" style="width: 100%; height: 500px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: #fff;"></iframe>
+            </div>
+            <!-- 右侧 修改指令面板 -->
+            <div style="flex:1; min-width:280px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:8px; padding:1.2rem; display:flex; flex-direction:column; gap:1rem;">
+              <h4 style="color:var(--neon-blue); margin-bottom:0.5rem; font-weight:600; display:flex; align-items:center; gap:0.4rem;">
+                🛠 演示文稿修改助手
+              </h4>
+              <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.4;">您可以输入自然语言指令来重新设计、修改或精简某一页幻灯片内容，云端重新生成后将作为新版本发布。</p>
+              
+              <div class="form-group">
+                <label for="artifact-revise-slide-index" style="font-size:0.8rem; font-weight:500;">选择要修改的幻灯片页码</label>
+                <select id="artifact-revise-slide-index" style="width:100%; padding:0.6rem; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:var(--text-primary); margin-top:0.4rem;">
+                  <option value="0">第 1 页 (封面页)</option>
+                  <option value="1">第 2 页</option>
+                  <option value="2">第 3 页</option>
+                  <option value="3">第 4 页</option>
+                  <option value="4">第 5 页</option>
+                  <option value="5">第 6 页</option>
+                  <option value="6">第 7 页</option>
+                  <option value="7">第 8 页</option>
+                  <option value="8">第 9 页</option>
+                  <option value="9">第 10 页</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="artifact-revise-prompt" style="font-size:0.8rem; font-weight:500;">输入修改指令</label>
+                <textarea id="artifact-revise-prompt" class="form-control" rows="4" placeholder="例如：将这页幻灯片的图片置于左侧，文字置于右侧；或者缩短标题" style="width:100%; padding:0.6rem; margin-top:0.4rem; font-size:0.8rem; resize:none;"></textarea>
+              </div>
+
+              <button id="btn-submit-revise-slide" class="btn btn-primary" style="width:100%; padding:0.7rem; font-size:0.85rem; font-weight:600;">
+                生成修订后的演示文稿
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div id="artifact-download-selector-wrapper" class="hidden" style="display: flex; align-items: center; gap: 0.5rem;">
+          <label for="artifact-download-format" style="font-size: 0.85rem; color: var(--text-secondary);">下载格式:</label>
+          <select id="artifact-download-format" style="padding: 0.3rem 0.6rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: var(--text-primary); font-size: 0.85rem; cursor: pointer; outline: none;"></select>
+        </div>
         <button id="btn-download-artifact" class="btn btn-purple">
           <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
